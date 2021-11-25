@@ -1,7 +1,7 @@
 import BaseSchema from '@ioc:Adonis/Lucid/Schema'
 
 export default class Sprints extends BaseSchema {
-  protected tableName = 'sprints'
+  protected tableName = 'sprints';
 
   public async up () {
     this.schema.createTable(this.tableName, (table) => {
@@ -20,6 +20,6 @@ export default class Sprints extends BaseSchema {
   }
 
   public async down () {
-    this.schema.dropTable(this.tableName)
+    this.schema.dropTable(this.tableName);
   }
 }
