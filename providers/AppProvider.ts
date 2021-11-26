@@ -8,7 +8,34 @@ export default class AppProvider {
   }
 
   public async boot() {
-    // IoC container is ready
+    const { 
+			DatabaseQueryBuilder,
+			ModelQueryBuilder, 
+		} = this.app.container.use('Adonis/Lucid/Database');
+
+		DatabaseQueryBuilder.macro('withTrashed', function () {
+			this.whereRaw('(deleted_at IS NULL or deleted_at IS NOT NULL)');
+
+			return this;
+		});
+
+		DatabaseQueryBuilder.macro('onlyTrashed', function () {
+			this.whereNotNull('deleted_at');
+
+			return this;
+		});
+
+		ModelQueryBuilder.macro('withTrashed', function () {
+			this.whereRaw('(deleted_at IS NULL or deleted_at IS NOT NULL)');
+
+			return this;
+		});
+
+		ModelQueryBuilder.macro('onlyTrashed', function () {
+			this.whereNotNull('deleted_at');
+
+			return this;
+		});
   }
 
   public async ready() {
