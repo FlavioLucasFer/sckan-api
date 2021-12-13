@@ -15,12 +15,14 @@ export default class Role extends SoftDeleteBaseModel {
 	public name: string;
 
   @column.dateTime({ 
+		serializeAs: 'createdAt',
 		autoCreate: true, 
 		serialize: (value: DateTime | null) => Serialize.formatTimestamp(value),
 	})
   public createdAt: DateTime;
 
 	@column.dateTime({ 
+		serializeAs: 'updatedAt',
 		autoCreate: true, 
 		autoUpdate: true, 
 		serialize: (value: DateTime | null) => Serialize.formatTimestamp(value),

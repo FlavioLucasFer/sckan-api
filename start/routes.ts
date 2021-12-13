@@ -24,5 +24,8 @@ Route.get('/', async () => {
   return { hello: 'world' }
 })
 
-Route.post('/roles/:id/restore', 'RolesController.restore')
+Route.post('/roles/:id/restore', 'RolesController.restore');
 Route.resource('roles', 'RolesController').apiOnly();
+Route.put('/companies/:id/logo', 'CompaniesController.logo');
+Route.post('/companies/:id/restore', 'CompaniesController.restore');
+Route.resource('companies', 'CompaniesController').apiOnly();
