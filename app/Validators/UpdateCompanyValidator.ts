@@ -12,7 +12,7 @@ export default class UpdateCompanyValidator {
 			rules.unique({ table: this.table, column: 'name' }),
 		]),
 
-		tradeName: schema.string.optional({ trim: true }, [
+		tradeName: schema.string.nullableAndOptional({ trim: true }, [
 			rules.maxLength(255),
 			rules.unique({ table: this.table, column: 'trade_name' }),
 		]),

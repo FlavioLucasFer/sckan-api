@@ -26,6 +26,11 @@ Route.get('/', async () => {
 
 Route.post('/roles/:id/restore', 'RolesController.restore');
 Route.resource('roles', 'RolesController').apiOnly();
+
 Route.put('/companies/:id/logo', 'CompaniesController.logo');
 Route.post('/companies/:id/restore', 'CompaniesController.restore');
 Route.resource('companies', 'CompaniesController').apiOnly();
+
+Route.put('/users/:id/picture', 'UsersController.picture');
+Route.post('/users/:id/restore', 'UsersController.restore');
+Route.resource('users', 'UsersController').apiOnly();
