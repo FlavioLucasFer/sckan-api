@@ -41,12 +41,6 @@ export default class User extends SoftDeleteBaseModel {
 	@column({ serializeAs: 'roleId' })
 	public roleId: string;
 
-	@belongsTo(() => Company, { foreignKey: 'company_id' })
-	public company: BelongsTo<typeof Company>;
-
-	@hasOne(() => Role, { foreignKey: 'role_id' })
-	public role: HasOne<typeof Role>;
-
   @column.dateTime({ 
 		serializeAs: 'createdAt',
 		autoCreate: true,
@@ -65,6 +59,12 @@ export default class User extends SoftDeleteBaseModel {
 	@column.dateTime({ serializeAs: null })
 	public deletedAt: DateTime;
 
+	@belongsTo(() => Company, { foreignKey: 'company_id' })
+	public company: BelongsTo<typeof Company>;
+
+	@hasOne(() => Role, { foreignKey: 'role_id' })
+	public role: HasOne<typeof Role>;
+
 	@beforeSave()
 	public static async hashPassword(user: User) {
 		if (user.$dirty.password) 
@@ -79,6 +79,8 @@ export default class User extends SoftDeleteBaseModel {
 		const query = this.query(options)
 			.select([
 				'id',
+				'companyId',
+				'roleId',
 				'name',
 				'username',
 				'email',
@@ -103,6 +105,8 @@ export default class User extends SoftDeleteBaseModel {
 		const query = this.query(options)
 			.select([
 				'id',
+				'companyId',
+				'roleId',
 				'name',
 				'username',
 				'email',
