@@ -24,13 +24,25 @@ Route.get('/', async () => {
   return { hello: 'world' }
 })
 
-Route.post('/roles/:id/restore', 'RolesController.restore');
-Route.resource('roles', 'RolesController').apiOnly();
+Route.group(() => {
+	Route.post('/login', 'AuthController.login');
+	Route.post('/logout', 'AuthController.logout').middleware('auth');
+	Route.post('/me', 'AuthController.loggedUser').middleware('auth');
+}).prefix('/auth');
 
-Route.put('/companies/:id/logo', 'CompaniesController.logo');
-Route.post('/companies/:id/restore', 'CompaniesController.restore');
-Route.resource('companies', 'CompaniesController').apiOnly();
+Route.resource('roles', 'RolesController').apiOnly().middleware({ '*': ['auth'] });
+Route.post('/roles/:id/restore', 'RolesController.restore').middleware('auth');
 
-Route.put('/users/:id/picture', 'UsersController.picture');
-Route.post('/users/:id/restore', 'UsersController.restore');
-Route.resource('users', 'UsersController').apiOnly();
+Route.resource('companies', 'CompaniesController').apiOnly().middleware({ '*': ['auth'] });
+Route.group(() => {
+	Route.put('/logo', 'CompaniesController.logo');
+	Route.post('/restore', 'CompaniesController.restore');
+}).prefix('/companies/:id')
+	.middleware('auth');
+
+Route.resource('users', 'UsersController').apiOnly().middleware({ '*': ['auth'] });
+Route.group(() => {
+	Route.put('/picture', 'UsersController.picture');
+	Route.post('/restore', 'UsersController.restore');
+}).prefix('/users/:id')
+	.middleware('auth');
