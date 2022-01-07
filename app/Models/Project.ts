@@ -1,9 +1,19 @@
 import { DateTime } from 'luxon';
-import { BelongsTo, belongsTo, column, HasOne, hasOne, LucidModel, ModelAdapterOptions } from '@ioc:Adonis/Lucid/Orm';
+import { 
+	BelongsTo, 
+	belongsTo, 
+	column, 
+	HasOne, 
+	hasOne, 
+	LucidModel, 
+	ModelAdapterOptions, 
+} from '@ioc:Adonis/Lucid/Orm';
 
 import SoftDeleteBaseModel from 'App/Models/SoftDeleteBaseModel';
 import Company from 'App/Models/Company';
-import User from './User';
+import User from 'App/Models/User';
+
+import Serialize from 'App/Helpers/Serialize';
 
 export default class Project extends SoftDeleteBaseModel {
   @column({ isPrimary: true })
@@ -32,14 +42,16 @@ export default class Project extends SoftDeleteBaseModel {
 
   @column.dateTime({ 
 		autoCreate: true, 
-		serializeAs: 'createdAt' 
+		serializeAs: 'createdAt',
+		serialize: (value: DateTime | null) => Serialize.formatTimestamp(value),
 	})
   public createdAt: DateTime;
 	
   @column.dateTime({ 
 		autoCreate: true, 
 		autoUpdate: true, 
-		serializeAs: 'updatedAt' 
+		serializeAs: 'updatedAt',
+		serialize: (value: DateTime | null) => Serialize.formatTimestamp(value),
 	})
   public updatedAt: DateTime;
 
