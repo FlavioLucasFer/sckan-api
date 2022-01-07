@@ -61,14 +61,10 @@ export default class ProjectsController {
 			query.limit(limit);
 
 		try {
-			let projects: Array<Project> | Object;
-
 			if (page) 
-				projects = (await query.paginate(page, pageLimit)).toJSON();
-			else 
-				projects = await query;
+				return (await query.paginate(page, pageLimit)).toJSON();
 			
-			return projects;
+			return await query;
 		} catch (err) {
 			if (err?.errno)
 				return response.badRequest(err);
@@ -135,9 +131,7 @@ export default class ProjectsController {
 			query.select('logo');
 		
 		try {
-			const project = await query.firstOrFail();
-
-			return project;
+			return await query.firstOrFail();
 		} catch (err) {
 			if (err.code === 'E_ROW_NOT_FOUND')
 				return response.notFound({

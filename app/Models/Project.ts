@@ -3,6 +3,8 @@ import {
 	BelongsTo, 
 	belongsTo, 
 	column, 
+	HasMany, 
+	hasMany, 
 	HasOne, 
 	hasOne, 
 	LucidModel, 
@@ -10,10 +12,10 @@ import {
 } from '@ioc:Adonis/Lucid/Orm';
 
 import SoftDeleteBaseModel from 'App/Models/SoftDeleteBaseModel';
-import Company from 'App/Models/Company';
-import User from 'App/Models/User';
-
 import Serialize from 'App/Helpers/Serialize';
+import Company from 'App/Models/Company';
+import Sprint from 'App/Models/Sprint';
+import User from 'App/Models/User';
 
 export default class Project extends SoftDeleteBaseModel {
   @column({ isPrimary: true })
@@ -58,11 +60,14 @@ export default class Project extends SoftDeleteBaseModel {
 	@column.dateTime({ serializeAs: null })
 	public deletedAt: DateTime;
 
-	@belongsTo(() => Company, { foreignKey: 'company_id' })
+	@belongsTo(() => Company, { foreignKey: 'companyId' })
 	public company: BelongsTo<typeof Company>;
 
-	@hasOne(() => User, { foreignKey: 'responsible_id' })
+	@hasOne(() => User, { foreignKey: 'responsibleId' })
 	public responsible: HasOne<typeof User>;
+
+	@hasMany(() => Sprint, { foreignKey: 'projectId' })
+	public sprints: HasMany<typeof Sprint>;
 
 	static async customAll<T extends LucidModel>(
 		this: T,

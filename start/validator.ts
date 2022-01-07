@@ -19,13 +19,16 @@ validator.rule('uniqueCompound', async (
 	fields.forEach((field: string, index: number) => {
 		try {
 			const reqField = options.root[fieldsAlias[index] ? fieldsAlias[index] : field];
-	
+
+			if (!reqField)
+				return;
+
 			query.where(field, reqField);
 		} catch (err) {
 			throw new Error("Fields dont match");
 		}
 	});
-
+	
 	const exist = await query.first();
 
 	if (exist) {
