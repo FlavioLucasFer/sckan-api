@@ -1,9 +1,7 @@
-import Hash from '@ioc:Adonis/Core/Hash';
 import { DateTime } from 'luxon';
-import {  
-	beforeSave, 
-	belongsTo, 
+import { 
 	BelongsTo, 
+	belongsTo, 
 	column, 
 	HasOne, 
 	hasOne, 
@@ -12,11 +10,12 @@ import {
 } from '@ioc:Adonis/Lucid/Orm';
 
 import SoftDeleteBaseModel from 'App/Models/SoftDeleteBaseModel';
-import Serialize from 'App/Helpers/Serialize';
 import Company from 'App/Models/Company';
-import Role from 'App/Models/Role';
+import User from 'App/Models/User';
 
-export default class User extends SoftDeleteBaseModel {
+import Serialize from 'App/Helpers/Serialize';
+
+export default class Project extends SoftDeleteBaseModel {
   @column({ isPrimary: true })
   public id: number;
 
@@ -24,34 +23,34 @@ export default class User extends SoftDeleteBaseModel {
 	public name: string;
 
 	@column()
-	public username: string;
+	public description: string;
+
+	@column({ serializeAs: 'contractorName' })
+	public contractorName: string;
+
+	@column({ serializeAs: 'cloneUrl' })
+	public cloneUrl: string;
 
 	@column()
-	public email: string;
-
-	@column({ serializeAs: null })
-	public password: string;
-	
-	@column()
-	public picture: Buffer | null;
+	public logo: Blob | null;
 
 	@column({ serializeAs: 'companyId' })
 	public companyId: number;
 
-	@column({ serializeAs: 'roleId' })
-	public roleId: string;
+	@column({ serializeAs: 'responsibleId' })
+	public responsibleId: number;
 
   @column.dateTime({ 
+		autoCreate: true, 
 		serializeAs: 'createdAt',
-		autoCreate: true,
 		serialize: (value: DateTime | null) => Serialize.formatTimestamp(value),
 	})
   public createdAt: DateTime;
-
+	
   @column.dateTime({ 
-		serializeAs: 'updatedAt',
 		autoCreate: true, 
 		autoUpdate: true, 
+		serializeAs: 'updatedAt',
 		serialize: (value: DateTime | null) => Serialize.formatTimestamp(value),
 	})
   public updatedAt: DateTime;
@@ -62,62 +61,56 @@ export default class User extends SoftDeleteBaseModel {
 	@belongsTo(() => Company, { foreignKey: 'company_id' })
 	public company: BelongsTo<typeof Company>;
 
-	@hasOne(() => Role, { foreignKey: 'role_id' })
-	public role: HasOne<typeof Role>;
-
-	@beforeSave()
-	public static async hashPassword(user: User) {
-		if (user.$dirty.password) 
-			user.password = await Hash.make(user.password);
-	}
+	@hasOne(() => User, { foreignKey: 'responsible_id' })
+	public responsible: HasOne<typeof User>;
 
 	static async customAll<T extends LucidModel>(
-		this: T, 
-		withPicture: boolean = false, 
+		this: T,
+		withLogo: boolean = false,
 		options?: ModelAdapterOptions,
 	): Promise<InstanceType<T>[]> {
 		const query = this.query(options)
 			.select([
 				'id',
 				'companyId',
-				'roleId',
+				'responsibleId',
 				'name',
-				'username',
-				'email',
-				'password',
+				'description',
+				'contractorName',
+				'cloneUrl',
 				'createdAt',
 				'updatedAt',
 			]);
-			
 
-		if (withPicture)
-			query.select('picture');
+
+		if (withLogo)
+			query.select('logo');
 
 		return await query;
 	}
 
 	static async customFindOrFail<T extends LucidModel>(
-		this: T, 
-		value: any, 
-		withPicture: boolean = false, 
+		this: T,
+		value: any,
+		withLogo: boolean = false,
 		options?: ModelAdapterOptions
 	): Promise<InstanceType<T>> {
 		const query = this.query(options)
 			.select([
 				'id',
 				'companyId',
-				'roleId',
+				'responsibleId',
 				'name',
-				'username',
-				'email',
-				'password',
+				'description',
+				'contractorName',
+				'cloneUrl',
 				'createdAt',
 				'updatedAt',
 			])
 			.where('id', value);
 
-		if (withPicture)
-			query.select('picture');
+		if (withLogo)
+			query.select('logo');
 
 		return await query.firstOrFail();
 	}

@@ -46,3 +46,10 @@ Route.group(() => {
 	Route.post('/restore', 'UsersController.restore');
 }).prefix('/users/:id')
 	.middleware('auth');
+
+Route.group(() => {
+	Route.put('/logo', 'ProjectsController.logo');
+	Route.post('/restore', 'ProjectsController.restore');
+}).prefix('/projects/:id')
+	.middleware('auth');
+Route.resource('projects', 'ProjectsController').apiOnly().middleware({ '*': ['auth'] });
