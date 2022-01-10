@@ -1,20 +1,22 @@
 import Hash from '@ioc:Adonis/Core/Hash';
-import { DateTime } from 'luxon';
 import {  
 	beforeSave, 
 	belongsTo, 
 	BelongsTo, 
 	column, 
-	HasOne, 
-	hasOne, 
+	HasMany, 
+	hasMany, 
 	LucidModel, 
 	ModelAdapterOptions, 
 } from '@ioc:Adonis/Lucid/Orm';
+import { DateTime } from 'luxon';
 
 import SoftDeleteBaseModel from 'App/Models/SoftDeleteBaseModel';
-import Serialize from 'App/Helpers/Serialize';
 import Company from 'App/Models/Company';
+import Project from 'App/Models/Project';
 import Role from 'App/Models/Role';
+
+import Serialize from 'App/Helpers/Serialize';
 
 export default class User extends SoftDeleteBaseModel {
   @column({ isPrimary: true })
@@ -59,11 +61,14 @@ export default class User extends SoftDeleteBaseModel {
 	@column.dateTime({ serializeAs: null })
 	public deletedAt: DateTime;
 
-	@belongsTo(() => Company, { foreignKey: 'company_id' })
+	@belongsTo(() => Company, { foreignKey: 'companyId' })
 	public company: BelongsTo<typeof Company>;
 
-	@hasOne(() => Role, { foreignKey: 'role_id' })
-	public role: HasOne<typeof Role>;
+	@belongsTo(() => Role, { foreignKey: 'roleId' })
+	public role: BelongsTo<typeof Role>;
+
+	@hasMany(() => Project, { foreignKey: 'responsibleId' })
+	public projects: HasMany<typeof Project>;
 
 	@beforeSave()
 	public static async hashPassword(user: User) {

@@ -1,9 +1,16 @@
-import { DateTime } from 'luxon';
+import { 
+	beforeSave, 
+	column, 
+	HasMany, 
+	hasMany,
+} from '@ioc:Adonis/Lucid/Orm';
 import { string } from '@ioc:Adonis/Core/Helpers';
-import { beforeSave, column } from '@ioc:Adonis/Lucid/Orm';
+import { DateTime } from 'luxon';
+
+import SoftDeleteBaseModel from 'App/Models/SoftDeleteBaseModel';
+import User from 'App/Models/User';
 
 import Serialize from 'App/Helpers/Serialize';
-import SoftDeleteBaseModel from 'App/Models/SoftDeleteBaseModel';
 
 export default class Role extends SoftDeleteBaseModel {
  	public static selfAssignPrimaryKey = true;
@@ -31,6 +38,9 @@ export default class Role extends SoftDeleteBaseModel {
 
 	@column.dateTime({ serializeAs: null })
 	public deletedAt: DateTime;
+
+	@hasMany(() => User, { foreignKey: 'roleId' })
+	public users: HasMany<typeof User>;
 
 	@beforeSave()
 	public static assignSlug(role: Role) {
