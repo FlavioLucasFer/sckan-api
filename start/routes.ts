@@ -56,3 +56,6 @@ Route.resource('projects', 'ProjectsController').apiOnly().middleware({ '*': ['a
 
 Route.post('/sprints/:id/restore', 'SprintsController.restore').middleware('auth');
 Route.resource('sprints', 'SprintsController').apiOnly().middleware({ '*': ['auth'] });
+
+Route.post('/labels/:id/restore', 'LabelsController.restore').middleware('auth');
+Route.resource('labels', 'LabelsController').apiOnly().middleware({ '*': ['auth'] });

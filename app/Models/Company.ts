@@ -1,7 +1,16 @@
-import { DateTime } from 'luxon'
-import { column, LucidModel, ModelAdapterOptions } from '@ioc:Adonis/Lucid/Orm'
+import { 
+	column, 
+	HasMany, 
+	hasMany, 
+	LucidModel, 
+	ModelAdapterOptions,
+} from '@ioc:Adonis/Lucid/Orm';
+import { DateTime } from 'luxon';
 
 import SoftDeleteBaseModel from 'App/Models/SoftDeleteBaseModel';
+import Project from 'App/Models/Project';
+import Label from 'App/Models/Label';
+
 import Serialize from 'App/Helpers/Serialize';
 
 export default class Company extends SoftDeleteBaseModel {
@@ -37,6 +46,12 @@ export default class Company extends SoftDeleteBaseModel {
 
 	@column.dateTime({ serializeAs: null })
 	public deletedAt: DateTime;
+
+	@hasMany(() => Project, { foreignKey: 'companyId' })
+	public projects: HasMany<typeof Project>
+
+	@hasMany(() => Label, { foreignKey: 'companyId' })
+	public labels: HasMany<typeof Label>
 
 	static async customAll<T extends LucidModel>(this: T, withLogo: boolean = false, options?: ModelAdapterOptions): Promise<InstanceType<T>[]> {
 		const query = this.query(options)
