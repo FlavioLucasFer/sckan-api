@@ -53,3 +53,6 @@ Route.group(() => {
 }).prefix('/projects/:id')
 	.middleware('auth');
 Route.resource('projects', 'ProjectsController').apiOnly().middleware({ '*': ['auth'] });
+
+Route.post('/sprints/:id/restore', 'SprintsController.restore').middleware('auth');
+Route.resource('sprints', 'SprintsController').apiOnly().middleware({ '*': ['auth'] });
