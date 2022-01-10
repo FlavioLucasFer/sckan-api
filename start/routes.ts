@@ -59,3 +59,6 @@ Route.resource('sprints', 'SprintsController').apiOnly().middleware({ '*': ['aut
 
 Route.post('/labels/:id/restore', 'LabelsController.restore').middleware('auth');
 Route.resource('labels', 'LabelsController').apiOnly().middleware({ '*': ['auth'] });
+
+Route.post('/priorities/:id/restore', 'PrioritiesController.restore').middleware('auth');
+Route.resource('priorities', 'PrioritiesController').apiOnly().middleware({ '*': ['auth'] });
