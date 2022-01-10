@@ -62,3 +62,6 @@ Route.resource('labels', 'LabelsController').apiOnly().middleware({ '*': ['auth'
 
 Route.post('/priorities/:id/restore', 'PrioritiesController.restore').middleware('auth');
 Route.resource('priorities', 'PrioritiesController').apiOnly().middleware({ '*': ['auth'] });
+
+Route.post('/statuses/:id/restore', 'StatusesController.restore').middleware('auth');
+Route.resource('statuses', 'StatusesController').apiOnly().middleware({ '*': ['auth'] });

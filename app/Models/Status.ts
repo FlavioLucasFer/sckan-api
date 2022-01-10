@@ -1,27 +1,29 @@
 import { 
-	BelongsTo, 
-	belongsTo, 
-	column, 
-} from '@ioc:Adonis/Lucid/Orm';
-import { DateTime } from 'luxon';
+	belongsTo,
+	BelongsTo,
+	column,
+	HasOne,
+	hasOne, 
+} from '@ioc:Adonis/Lucid/Orm'
+import { DateTime } from 'luxon'
 
 import SoftDeleteBaseModel from 'App/Models/SoftDeleteBaseModel';
 import Company from 'App/Models/Company';
 
 import Serialize from 'App/Helpers/Serialize';
 
-export default class Priority extends SoftDeleteBaseModel {
-  @column({ isPrimary: true })
-  public id: number;
-
-	@column()
-	public name: string;
+export default class Status extends SoftDeleteBaseModel {
+	@column({ isPrimary: true })
+	public id: number;
 	
 	@column()
-	public color: string;
+	public name: string;
 
-	@column()
-	public level: number;
+	@column({ serializeAs: 'previousStatusId' })
+	public previousStatusId: number;
+
+	@column({ serializeAs: 'nextStatusId' })
+	public nextStatusId: number;
 
 	@column({ serializeAs: 'companyId' })
 	public companyId: number;
@@ -46,4 +48,10 @@ export default class Priority extends SoftDeleteBaseModel {
 
 	@belongsTo(() => Company, { foreignKey: 'companyId' })
 	public company: BelongsTo<typeof Company>;
+
+	@hasOne(() => Status, { foreignKey: 'previousStatusId' })
+	public previousStatus: HasOne<typeof Status>;
+
+	@hasOne(() => Status, { foreignKey: 'nextStatusId' })
+	public nextStatus: HasOne<typeof Status>;
 }

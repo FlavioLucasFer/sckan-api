@@ -226,7 +226,7 @@ export default class SprintsController {
 			sprint.endedAt = endedAt;
 
 		if (project)
-			sprint.project = project;
+			sprint.projectId = project;
 
 		try {
 			await sprint.save();
