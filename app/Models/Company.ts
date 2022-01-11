@@ -8,7 +8,9 @@ import {
 import { DateTime } from 'luxon';
 
 import SoftDeleteBaseModel from 'App/Models/SoftDeleteBaseModel';
+import Priority from 'App/Models/Priority';
 import Project from 'App/Models/Project';
+import Status from 'App/Models/Status';
 import Label from 'App/Models/Label';
 
 import Serialize from 'App/Helpers/Serialize';
@@ -48,10 +50,16 @@ export default class Company extends SoftDeleteBaseModel {
 	public deletedAt: DateTime;
 
 	@hasMany(() => Project, { foreignKey: 'companyId' })
-	public projects: HasMany<typeof Project>
+	public projects: HasMany<typeof Project>;
 
 	@hasMany(() => Label, { foreignKey: 'companyId' })
-	public labels: HasMany<typeof Label>
+	public labels: HasMany<typeof Label>;
+
+	@hasMany(() => Priority, { foreignKey: 'companyId' })
+	public priorities: HasMany<typeof Priority>;
+
+	@hasMany(() => Status, { foreignKey: 'companyId' })
+	public statuses: HasMany<typeof Status>;
 
 	static async customAll<T extends LucidModel>(this: T, withLogo: boolean = false, options?: ModelAdapterOptions): Promise<InstanceType<T>[]> {
 		const query = this.query(options)

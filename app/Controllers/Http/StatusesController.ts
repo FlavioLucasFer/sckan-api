@@ -1,14 +1,15 @@
-import { HttpContextContract } from '@ioc:Adonis/Core/HttpContext'
-import Label from 'App/Models/Label';
+import { HttpContextContract } from '@ioc:Adonis/Core/HttpContext';
 
-import StoreLabelValidator from 'App/Validators/StoreLabelValidator';
-import UpdateLabelValidator from 'App/Validators/UpdateLabelValidator';
+import Status from 'App/Models/Status';
 
-export default class LabelsController {
+import StoreStatusValidator from 'App/Validators/StoreStatusValidator';
+import UpdateStatusValidator from 'App/Validators/UpdateStatusValidator';
+
+export default class StatusesController {
 	private columns: Array<string>;
 
 	private constructor() {
-		const columns = Array.from(Label.$columnsDefinitions, ([key]) => key);
+		const columns = Array.from(Status.$columnsDefinitions, ([key]) => key);
 		columns.splice(columns.indexOf('deletedAt'), 1);
 
 		this.columns = columns;
@@ -18,8 +19,8 @@ export default class LabelsController {
 		const {
 			company,
 			name,
-			description,
-			color,
+			previousStatus,
+			nextStatus,
 			columns = this.columns,
 			limit,
 			page,
@@ -27,28 +28,28 @@ export default class LabelsController {
 		} = request.only([
 			'company',
 			'name',
-			'description',
-			'color',
+			'previousStatus',
+			'nextStatus',
 			'columns',
 			'limit',
 			'page',
 			'pageLimit',
 		]);
 
-		const query = Label.query()
+		const query = Status.query()
 			.select(typeof columns === 'string' ? columns.split(',') : columns);
 
 		if (company)
-			query.where('companyId', company);
+			query.where('companyId', company)
 
 		if (name)
-			query.where('name', 'LIKE', `%${name}%`);
+			query.where('name', 'LIKE', `%${name}%`)
 
-		if (description)
-			query.where('description', 'LIKE', `%${description}%`);
+		if (previousStatus)
+			query.where('previousStatusId', previousStatus)
 
-		if (color)
-			query.where('color', color);
+		if (nextStatus)
+			query.where('nextStatusId', nextStatus)
 
 		if (limit)
 			query.limit(limit);
@@ -64,40 +65,40 @@ export default class LabelsController {
 
 			return response.internalServerError(err);
 		}
-	}
+	};
 
   public async store({ request, response }: HttpContextContract) {
 		try {
-			await request.validate(StoreLabelValidator);
+			await request.validate(StoreStatusValidator);
 		} catch (err) {
 			return response.badRequest(err);
 		}
 
 		const {
 			name,
-			description,
-			color,
+			previousStatus,
+			nextStatus,
 			company,
 		} = request.only([
 			'name',
-			'description',
-			'color',
-			'company',
+			'previousStatus',
+			'nextStatus',
+			'company'
 		]);
 
 		try {
-			const label = await Label.create({
+			const status = await Status.create({
 				name,
-				description,
-				color,
+				previousStatusId: previousStatus,
+				nextStatusId: nextStatus,
 				companyId: company,
 			});
 
-			return response.created(label);
+			return response.created(status);
 		} catch (err) {
 			return response.internalServerError(err);
 		}
-	}
+	};
 
   public async show({ params, request, response }: HttpContextContract) {
 		const { id } = params;
@@ -105,7 +106,7 @@ export default class LabelsController {
 		const { columns = this.columns } = request.only(['columns']);
 
 		try {
-			return await Label.query()
+			return await Status.query()
 				.select(typeof columns === 'string' ? columns.split(',') : columns)
 				.where('id', id)
 				.firstOrFail()
@@ -121,14 +122,14 @@ export default class LabelsController {
 
 			return response.internalServerError(err);
 		}
-	}
+	};
 
   public async update({ params, request, response }: HttpContextContract) {
 		const { id } = params;
-		let label: Label;
+		let status: Status;
 
 		try {
-			label = await Label.findOrFail(id);
+			status = await Status.findOrFail(id);
 		} catch (err) {
 			return response.notFound({
 				code: err.code,
@@ -137,50 +138,50 @@ export default class LabelsController {
 		}
 
 		try {
-			await request.validate(UpdateLabelValidator);
+			await request.validate(UpdateStatusValidator);
 		} catch (err) {
 			return response.badRequest(err);
 		}
 
 		const {
 			name,
-			description,
-			color,
+			previousStatus,
+			nextStatus,
 			company,
 		} = request.only([
 			'name',
-			'description',
-			'color',
-			'company',
+			'previousStatus',
+			'nextStatus',
+			'company'
 		]);
 
 		if (name)
-			label.name = name;
+			status.name = name;
 
-		if (description)
-			label.description = description;
+		if (previousStatus)
+			status.previousStatusId = previousStatus;
 
-		if (color)
-			label.color = color;
+		if (nextStatus)
+			status.nextStatusId = nextStatus;
 
 		if (company)
-			label.companyId = company;
+			status.companyId = company;
 
 		try {
-			await label.save();
+			await status.save();
 
-			return label;
+			return status;
 		} catch (err) {
 			return response.internalServerError(err);
 		}
-	}
+	};
 
   public async destroy({ params, response }: HttpContextContract) {
 		const { id } = params;
-		let label: Label;
+		let status: Status;
 
 		try {
-			label = await Label.findOrFail(id);
+			status = await Status.findOrFail(id);
 		} catch (err) {
 			return response.notFound({
 				code: err.code,
@@ -189,20 +190,20 @@ export default class LabelsController {
 		}
 
 		try {
-			await label.softDelete();
+			await status.softDelete();
 		} catch (err) {
 			return response.internalServerError(err);
 		}
 
 		return true;
-	}
+	};
 
   public async restore({ params, response }: HttpContextContract) {
 		const { id } = params;
-		let label: any;
+		let status: any;
 
 		try {
-			label = await Label.findOnlyTrashedOrFail(id);
+			status = await Status.findOnlyTrashedOrFail(id);
 		} catch (err) {
 			return response.notFound({
 				code: err.code,
@@ -211,11 +212,11 @@ export default class LabelsController {
 		}
 
 		try {
-			await label.restore();
+			await status.restore();
 		} catch (err) {
 			return response.internalServerError(err);
 		}
 
 		return true;
-	}
+	};
 }

@@ -167,7 +167,7 @@ export default class PrioritiesController {
 			priority.level = level;
 
 		if (company)
-			priority.company = company;
+			priority.companyId = company;
 
 		try {
 			await priority.save();
