@@ -47,7 +47,7 @@ export default class StoreTaskValidator {
 	});
 
   public messages = {
-		required: 'The {{ field }} field is required to create new priority',
+		required: 'The {{ field }} field is required to create new task',
 		maxLength: 'Max length for {{ field }} field is {{ options.maxLength }} chars',
 		url: 'The {{ field }} must be a valid URL',
 		exists: 'The {{ field }} must be a valid registred {{ field }}',

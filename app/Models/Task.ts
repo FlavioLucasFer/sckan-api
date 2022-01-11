@@ -3,6 +3,8 @@ import {
 	BelongsTo,
 	belongsTo,
 	column,
+	ManyToMany,
+	manyToMany,
 } from '@ioc:Adonis/Lucid/Orm';
 import { DateTime } from 'luxon';
 
@@ -10,6 +12,7 @@ import SoftDeleteBaseModel from 'App/Models/SoftDeleteBaseModel';
 import Priority from 'App/Models/Priority';
 import Sprint from 'App/Models/Sprint';
 import Status from 'App/Models/Status';
+import Label from 'App/Models/Label';
 import User from 'App/Models/User';
 
 import Serialize from 'App/Helpers/Serialize';
@@ -87,6 +90,9 @@ export default class Task extends SoftDeleteBaseModel {
 
 	@belongsTo(() => Priority)
 	public priority: BelongsTo<typeof Priority>;
+
+	@manyToMany(() => Label, { pivotTable: 'task_labels' })
+	public labels: ManyToMany<typeof Label>;
 
 	@beforeCreate()
 	public static async taskUuid(task: Task) {
