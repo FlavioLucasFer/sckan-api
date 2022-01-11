@@ -65,3 +65,11 @@ Route.resource('priorities', 'PrioritiesController').apiOnly().middleware({ '*':
 
 Route.post('/statuses/:id/restore', 'StatusesController.restore').middleware('auth');
 Route.resource('statuses', 'StatusesController').apiOnly().middleware({ '*': ['auth'] });
+
+Route.group(() => {
+	Route.delete('/archive', 'TasksController.archive');
+	Route.post('/unarchive', 'TasksController.unarchive');
+	Route.post('/restore', 'TasksController.restore');
+}).prefix('/tasks/:id')
+	.middleware('auth');
+Route.resource('tasks', 'TasksController').apiOnly().middleware({ '*': ['auth'] });
