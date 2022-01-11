@@ -1,9 +1,11 @@
 import { HttpContextContract } from '@ioc:Adonis/Core/HttpContext';
 import { DateTime } from 'luxon';
 
+import TaskLabel from 'App/Models/TaskLabel';
 import Priority from 'App/Models/Priority';
 import Task from 'App/Models/Task';
 
+import AttachTaskLabelValidator from 'App/Validators/AttachTaskLabelValidator';
 import UpdateTaskValidator from 'App/Validators/UpdateTaskValidator';
 import StoreTaskValidator from 'App/Validators/StoreTaskValidator';
 
@@ -114,6 +116,9 @@ export default class TasksController {
 
 			if (preloads.includes('priority'))
 				query.preload('priority');
+
+			if (preloads.includes('labels'))
+				query.preload('labels');
 		}
 
 		try {
@@ -210,6 +215,9 @@ export default class TasksController {
 
 			if (preloads.includes('priority'))
 				query.preload('priority');
+
+			if (preloads.includes('labels'))
+				query.preload('labels');
 		}
 
 		try {
@@ -415,5 +423,87 @@ export default class TasksController {
 			return response.internalServerError(err);
 		}
 	};
+
+	public async labels({ params, response }: HttpContextContract) {
+		const { id } = params;
+		let task: Task;
+
+		try {
+			task = await Task.findOrFail(id);
+		} catch (err) {
+			return response.notFound({
+				code: err.code,
+				message: 'Task not found.',
+			});
+		}
+
+		try {
+			return await task.related('labels').query();
+		} catch (err) {
+			return response.internalServerError(err);
+		}
+	}
 	
+	public async attachLabel({ request, response }: HttpContextContract) {
+		try {
+			await request.validate(AttachTaskLabelValidator);
+		} catch (err) {
+			return response.badRequest(err);
+		}
+
+		const {
+			task,
+			label,
+		} = request.only([
+			'task',
+			'label',
+		]);
+
+		try {
+			await TaskLabel.create({
+				taskId: task,
+				labelId: label,
+			});
+
+			return response.created(
+				await Task.query()
+					.where('id', task)
+					.preload('labels')
+					.first()
+			);
+		} catch (err) {
+			return response.internalServerError(err);
+		}
+	}
+
+	public async unattachLabel({ params, response }: HttpContextContract) {
+		const {
+			id: task,
+			label_id: label,
+		} = params;
+		let taskLabel: TaskLabel;
+
+		try {
+			taskLabel = await TaskLabel.query()
+				.where('taskId', task)
+				.where('labelId', label)
+				.firstOrFail();
+		} catch (err) {
+			return response.notFound({
+				code: err.code,
+				message: `No label with id "${label}" is attached to task with id "${task}".`,
+			});
+		}
+
+		try {
+			await taskLabel.delete();
+			
+			return await Task.query()
+				.where('id', task)
+				.preload('labels')
+				.first();
+		} catch (err) {
+			return response.internalServerError(err);
+		}
+	}
 }

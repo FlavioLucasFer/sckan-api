@@ -67,9 +67,16 @@ Route.post('/statuses/:id/restore', 'StatusesController.restore').middleware('au
 Route.resource('statuses', 'StatusesController').apiOnly().middleware({ '*': ['auth'] });
 
 Route.group(() => {
-	Route.delete('/archive', 'TasksController.archive');
-	Route.post('/unarchive', 'TasksController.unarchive');
-	Route.post('/restore', 'TasksController.restore');
-}).prefix('/tasks/:id')
+	Route.group(() => {
+		Route.delete('/archive', 'TasksController.archive');
+		Route.post('/unarchive', 'TasksController.unarchive');
+		Route.post('/restore', 'TasksController.restore');
+		
+		Route.get('/labels', 'TasksController.labels');
+		Route.delete('/label/:label_id', 'TasksController.unattachLabel');
+	}).prefix('/:id');
+
+	Route.post('/label', 'TasksController.attachLabel');
+}).prefix('/tasks')
 	.middleware('auth');
 Route.resource('tasks', 'TasksController').apiOnly().middleware({ '*': ['auth'] });

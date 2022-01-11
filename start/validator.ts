@@ -8,12 +8,13 @@ validator.rule('uniqueCompound', async (
 		column,
 		fields,
 		fieldsAlias,
+		idColumn = 'id',
 	],
 	options,
 ) => {
 	const query = Database
 		.from(table)
-		.select('id')
+		.select(idColumn)
 		.where(column, value);
 
 	fields.forEach((field: string, index: number) => {
