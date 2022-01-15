@@ -1,7 +1,6 @@
 import Hash from '@ioc:Adonis/Core/Hash';
 import { HttpContextContract } from '@ioc:Adonis/Core/HttpContext';
 
-
 import LoginValidator from 'App/Validators/LoginValidator';
 import User from 'App/Models/User';
 

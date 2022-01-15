@@ -23,7 +23,7 @@ export default class Label extends SoftDeleteBaseModel {
 	@column()
 	public description: string;
 
-	@column()
+	@column({ serialize: (value: string) => `#${value}` })
 	public color: string;
 
 	@column({ serializeAs: 'companyId' })
