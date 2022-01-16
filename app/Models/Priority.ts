@@ -17,7 +17,7 @@ export default class Priority extends SoftDeleteBaseModel {
 	@column()
 	public name: string;
 	
-	@column()
+	@column({ serialize: (value: string) => `#${value}` })
 	public color: string;
 
 	@column()

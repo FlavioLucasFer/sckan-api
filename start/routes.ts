@@ -73,7 +73,7 @@ Route.group(() => {
 		Route.post('/restore', 'TasksController.restore');
 		
 		Route.get('/labels', 'TasksController.labels');
-		Route.delete('/label/:label_id', 'TasksController.unattachLabel');
+		Route.delete('/label/:labelId', 'TasksController.unattachLabel');
 	}).prefix('/:id');
 
 	Route.post('/label', 'TasksController.attachLabel');

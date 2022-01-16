@@ -1,42 +1,19 @@
 import { HttpContextContract } from '@ioc:Adonis/Core/HttpContext';
-import { DateTime } from 'luxon';
-
-import TaskLabel from 'App/Models/TaskLabel';
-import Priority from 'App/Models/Priority';
-import Task from 'App/Models/Task';
 
 import AttachTaskLabelValidator from 'App/Validators/AttachTaskLabelValidator';
 import UpdateTaskValidator from 'App/Validators/UpdateTaskValidator';
 import StoreTaskValidator from 'App/Validators/StoreTaskValidator';
 
+import TasksRepository from 'App/Repositories/TasksRepository';
+
 export default class TasksController {
-	private columns: Array<string>;
-
-	private constructor() {
-		const columns = Array.from(Task.$columnsDefinitions, ([key]) => key);
-		columns.splice(columns.indexOf('deletedAt'), 1);
-
-		this.columns = columns;
-	}
+	private repository = new TasksRepository();
 
   public async index({ request, response }: HttpContextContract) {
 		const {
-			uuid,
-			name,
-			description,
-			plannedSize,
-			size,
-			timeSpent,
-			issueUrl,
-			user,
-			sprint,
-			status,
-			priority,
 			preload,
-			columns = this.columns,
-			limit,
-			page,
-			pageLimit = 10,
+			columns,
+			...reqQueryParams
 		} = request.only([
 			'uuid',
 			'name',
@@ -56,76 +33,18 @@ export default class TasksController {
 			'pageLimit',
 		]);
 
-		const priorityLevelQuery = Priority.query()
-			.select('level')
-			.whereColumn('tasks.priority_id', '=','priorities.id');
-
-		const query = Task.query()
-			.select(typeof columns === 'string' ? columns.split(',') : columns)
-			.whereNull('archivedAt')
-			.orderBy(priorityLevelQuery, 'desc')
-			.orderBy('id', 'desc');
-		
-		if (uuid) 
-			query.where('uuid', `%${uuid.includes('#') ? uuid.slice(1) : uuid}%`);
-
-		if (name)
-			query.where('name', `%${description}%`);
-		
-		if (description)
-			query.where('description', `%${description}%`);
-		
-		if (plannedSize)
-			query.where('plannedSize', plannedSize);
-		
-		if (size)
-			query.where('size', size);
-		
-		if (timeSpent)
-			query.where('timeSpent', timeSpent);
-		
-		if (issueUrl)
-			query.where('issueUrl', 'LIKE', `%${issueUrl}%`);
-		
-		if (user)
-			query.where('userId', user);
-		
-		if (sprint)
-			query.where('sprintId', sprint);
-		
-		if (status)
-			query.where('statusId', status);
-		
-		if (priority)
-			query.where('priorityId', priority);
-		
-		if (limit)
-			query.limit(limit);
-
-		if (preload) {
-			const preloads = preload.split(',');
-
-			if (preloads.includes('user'))
-				query.preload('priority');
-			
-			if (preloads.includes('sprint'))
-				query.preload('sprint');
-			
-			if (preloads.includes('status'))
-				query.preload('status');
-
-			if (preloads.includes('priority'))
-				query.preload('priority');
-
-			if (preloads.includes('labels'))
-				query.preload('labels');
-		}
+		const preloads = preload ? preload.split(',') : [];
 
 		try {
-			if (page)
-				return (await query.paginate(page, pageLimit)).toJSON();
-
-			return await query;
+			return await this.repository.all({
+				...reqQueryParams,
+				columns: columns ? columns.split(',') : [],
+				preloadUser: preloads.includes('user'),
+				preloadPriority: preloads.includes('priority'),
+				preloadSprint: preloads.includes('sprint'),
+				preloadStatus: preloads.includes('status'),
+				preloadLabels: preloads.includes('labels'),
+			});
 		} catch (err) {
 			if (err?.errno)
 				return response.badRequest(err);
@@ -141,18 +60,7 @@ export default class TasksController {
 			return response.badRequest(err);
 		}
 
-		const {
-			name,
-			description,
-			plannedSize,
-			size,
-			timeSpent,
-			issueUrl,
-			user,
-			sprint,
-			status,
-			priority,
-		} = request.only([
+		const reqBody = request.only([
 			'name',
 			'description',
 			'plannedSize',
@@ -166,20 +74,9 @@ export default class TasksController {
 		]);
 
 		try {
-			const task = await Task.create({
-				name,
-				description,
-				plannedSize,
-				size,
-				timeSpent,
-				issueUrl,
-				userId: user,
-				sprintId: sprint,
-				statusId: status,
-				priorityId: priority,
-			});
-
-			return response.created(task);
+			return response.created(
+				await this.repository.persist(reqBody)
+			);
 		} catch (err) {
 			return response.internalServerError(err);
 		}
@@ -189,45 +86,27 @@ export default class TasksController {
 		const { id } = params;
 
 		const { 
-			columns = this.columns,
+			columns,
 			preload, 
 		} = request.only([
 			'columns',
 			'preload',
 		]);
 
-		const query = Task.query()
-			.select(typeof columns === 'string' ? columns.split(',') : columns)
-			.whereNull('archivedAt')
-			.where('id', id);
-
-		if (preload) {
-			const preloads = preload.split(',');
-
-			if (preloads.includes('user'))
-				query.preload('priority');
-
-			if (preloads.includes('sprint'))
-				query.preload('sprint');
-
-			if (preloads.includes('status'))
-				query.preload('status');
-
-			if (preloads.includes('priority'))
-				query.preload('priority');
-
-			if (preloads.includes('labels'))
-				query.preload('labels');
-		}
+		const preloads = preload ? preload.split(',') : [];
 
 		try {
-			return await query.firstOrFail();
+			return await this.repository.findOrFail(id, {
+				columns: columns ? columns.split(',') : [],
+				preloadUser: preloads.includes('user'),
+				preloadPriority: preloads.includes('priority'),
+				preloadSprint: preloads.includes('sprint'),
+				preloadStatus: preloads.includes('status'),
+				preloadLabels: preloads.includes('labels'),
+			});
 		} catch (err) {
 			if (err.code === 'E_ROW_NOT_FOUND')
-				return response.notFound({
-					code: err.code,
-					message: 'Record not found.',
-				});
+				return response.notFound(err);
 
 			if (err?.errno)
 				return response.badRequest(err);
@@ -238,19 +117,6 @@ export default class TasksController {
 
   public async update({ params, request, response }: HttpContextContract) {
 		const { id } = params;
-		let task: Task;
-
-		try {
-			task = await Task.query()
-				.whereNull('archivedAt')
-				.where('id', id)
-				.firstOrFail();
-		} catch (err) {
-			return response.notFound({
-				code: err.code,
-				message: 'Record not found.',
-			});
-		}
 
 		try {
 			await request.validate(UpdateTaskValidator);
@@ -258,18 +124,7 @@ export default class TasksController {
 			return response.badRequest(err);
 		}
 
-		const {
-			name,
-			description,
-			plannedSize,
-			size,
-			timeSpent,
-			issueUrl,
-			user,
-			sprint,
-			status,
-			priority,
-		} = request.only([
+		const reqBody = request.only([
 			'name',
 			'description',
 			'plannedSize',
@@ -282,164 +137,79 @@ export default class TasksController {
 			'priority',
 		]);
 
-		if (name)
-			task.name = name;
-
-		if (description)
-			task.description = description;
-
-		if (plannedSize)
-			task.plannedSize = plannedSize;
-
-		if (size)
-			task.size = size;
-
-		if (timeSpent)
-			task.timeSpent = timeSpent;
-
-		if (issueUrl)
-			task.issueUrl = issueUrl;
-
-		if (user)
-			task.userId = user;
-
-		if (sprint)
-			task.sprintId = sprint;
-
-		if (status)
-			task.statusId = status;
-
-		if (priority)
-			task.priorityId = priority;
-
 		try {
-			await task.save();
-
-			return task;
+			return await this.repository.update({ id, ...reqBody});
 		} catch (err) {
+			if (err.code === 'E_ROW_NOT_FOUND')
+				return response.notFound(err);
+
 			return response.internalServerError(err);
 		}
 	};
 
   public async archive({ params, response }: HttpContextContract) {
 		const { id } = params;
-		let task: Task;
 
 		try {
-			task = await Task.query()
-				.whereNull('archivedAt')
-				.where('id', id)
-				.firstOrFail();
+			return await this.repository.archive(id);
 		} catch (err) {
-			return response.notFound({
-				code: err.code,
-				message: 'Record not found.',
-			});
-		}
-		
-		task.archivedAt = DateTime.now();
+			if (err.code === 'E_ROW_NOT_FOUND')
+				return response.notFound(err);
 
-		try {
-			await task.save();
-
-			return true;
-		} catch (err) {
 			return response.internalServerError(err);
 		}
 	};
 
   public async unarchive({ params, response }: HttpContextContract) {
 		const { id } = params;
-		let task: Task;
 
 		try {
-			task = await Task.query()
-				.whereNotNull('archivedAt')
-				.where('id', id)
-				.firstOrFail();
-		} catch (err) {
-			return response.notFound({
-				code: err.code,
-				message: 'No archived task found.',
-			});
-		}
-
-		task.archivedAt = null;
-
-		try {
-			await task.save();
+			await this.repository.unarchive(id);
 
 			return true;
 		} catch (err) {
+			if (err.code === 'E_ROW_NOT_FOUND')
+				return response.notFound(err);
+
 			return response.internalServerError(err);
 		}
 	};
 
   public async destroy({ params, response }: HttpContextContract) {
 		const { id } = params;
-		let task: Task;
 
 		try {
-			task = await Task.query()
-				.where('id', id)
-				.firstOrFail();
+			return await this.repository.delete(id);
 		} catch (err) {
-			return response.notFound({
-				code: err.code,
-				message: 'Record not found.',
-			});
-		}
+			if (err.code === 'E_ROW_NOT_FOUND')
+				return response.notFound(err);
 
-		try {
-			await task.softDelete();
-
-			return true;
-		} catch (err) {
 			return response.internalServerError(err);
 		}
 	};
 
   public async restore({ params, response }: HttpContextContract) {
 		const { id } = params;
-		let task: Task;
 
 		try {
-			task = await Task.query()
-				.whereNotNull('deletedAt')
-				.where('id', id)
-				.firstOrFail();
+			return await this.repository.restore(id);
 		} catch (err) {
-			return response.notFound({
-				code: err.code,
-				message: 'No deleted record found.',
-			});
-		}
+			if (err.code === 'E_ROW_NOT_FOUND')
+				return response.notFound(err);
 
-		try {
-			await task.restore();
-
-			return true;
-		} catch (err) {
 			return response.internalServerError(err);
 		}
 	};
 
 	public async labels({ params, response }: HttpContextContract) {
 		const { id } = params;
-		let task: Task;
 
 		try {
-			task = await Task.findOrFail(id);
+			return await this.repository.labels(id);
 		} catch (err) {
-			return response.notFound({
-				code: err.code,
-				message: 'Task not found.',
-			});
-		}
+			if (err.code === 'E_ROW_NOT_FOUND')
+				return response.notFound(err);
 
-		try {
-			return await task.related('labels').query();
-		} catch (err) {
 			return response.internalServerError(err);
 		}
 	}
@@ -460,17 +230,7 @@ export default class TasksController {
 		]);
 
 		try {
-			await TaskLabel.create({
-				taskId: task,
-				labelId: label,
-			});
-
-			return response.created(
-				await Task.query()
-					.where('id', task)
-					.preload('labels')
-					.first()
-			);
+			return response.created(await this.repository.attachLabel(task, label));
 		} catch (err) {
 			return response.internalServerError(err);
 		}
@@ -479,29 +239,11 @@ export default class TasksController {
 	public async unattachLabel({ params, response }: HttpContextContract) {
 		const {
 			id: task,
-			label_id: label,
+			labelId: label,
 		} = params;
-		let taskLabel: TaskLabel;
 
 		try {
-			taskLabel = await TaskLabel.query()
-				.where('taskId', task)
-				.where('labelId', label)
-				.firstOrFail();
-		} catch (err) {
-			return response.notFound({
-				code: err.code,
-				message: `No label with id "${label}" is attached to task with id "${task}".`,
-			});
-		}
-
-		try {
-			await taskLabel.delete();
-			
-			return await Task.query()
-				.where('id', task)
-				.preload('labels')
-				.first();
+			return await this.repository.unattachLabel(task, label);
 		} catch (err) {
 			return response.internalServerError(err);
 		}
