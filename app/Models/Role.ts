@@ -13,7 +13,7 @@ import User from 'App/Models/User';
 import Serialize from 'App/Helpers/Serialize';
 
 export default class Role extends SoftDeleteBaseModel {
- 	public static selfAssignPrimaryKey = true;
+	public static selfAssignPrimaryKey = true;
 	
 	@column({ isPrimary: true })
   public id: string;
@@ -39,16 +39,24 @@ export default class Role extends SoftDeleteBaseModel {
 	@column.dateTime({ serializeAs: null })
 	public deletedAt: DateTime;
 
-	@hasMany(() => User, { foreignKey: 'roleId' })
+	@hasMany(() => User, { 
+		onQuery: query => {
+			query.select([
+				'id',
+				'name',
+				'username',
+				'email',
+				'companyId',
+				'roleId',
+				'createdAt',
+				'updatedAt',
+			]);
+		}, 
+	})
 	public users: HasMany<typeof User>;
 
 	@beforeSave()
 	public static assignSlug(role: Role) {
 		role.id = string.dashCase(role.id.normalize('NFD').trim().toLowerCase().replace(/[\u0300-\u036f]/g, ""));
-	}
-
-	@beforeSave()
-	public static trimName(role: Role) {
-		role.name = role.name.trim();
 	}
 }

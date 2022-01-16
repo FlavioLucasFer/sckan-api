@@ -74,7 +74,7 @@ export type FindOrFailQueryParams = {
 	columns?: string[],
 };
 
-interface TaskRepositoryInterface {
+interface TasksRepositoryInterface {
 	persist(fields: PersistTaskFields): Promise<Task>;
 	update(fields: UpdateTaskFields): Promise<Task>;
 	delete(id: number): Promise<boolean>;
@@ -88,7 +88,7 @@ interface TaskRepositoryInterface {
 	labels(taskId: number): Promise<Label[]>;
 };
 
-export default class TaskRepository implements TaskRepositoryInterface {
+export default class TasksRepository implements TasksRepositoryInterface {
 	private columns: string[];
 
 	public constructor() {
