@@ -4,10 +4,10 @@ import AttachTaskLabelValidator from 'App/Validators/AttachTaskLabelValidator';
 import UpdateTaskValidator from 'App/Validators/UpdateTaskValidator';
 import StoreTaskValidator from 'App/Validators/StoreTaskValidator';
 
-import TaskRepository from 'App/Repositories/TaskRepository';
+import TasksRepository from 'App/Repositories/TasksRepository';
 
 export default class TasksController {
-	private repository = new TaskRepository();
+	private repository = new TasksRepository();
 
   public async index({ request, response }: HttpContextContract) {
 		const {
