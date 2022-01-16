@@ -1,117 +1,135 @@
 import { HttpContextContract } from '@ioc:Adonis/Core/HttpContext';
 
-import Role from 'App/Models/Role';
 import RoleValidator from 'App/Validators/RoleValidator';
 
-export default class RolesController {
-  public async index({ response }: HttpContextContract) {
-		try {
-			const roles = await Role.all();
+import RolesRepository from 'App/Repositories/RolesRepository';
 
-			return response.ok(roles);
+export default class RolesController {
+  private repository = new RolesRepository();
+	
+	public async index({ request, response }: HttpContextContract) {
+		const {
+			columns,
+			preloadUsers,
+			...reqQueryParams
+		} = request.only([
+			'columns',
+			'preloadUsers',
+			'limit',
+			'page',
+			'pageLimit',
+		]);
+		
+		try {
+			return await this.repository.all({
+				...reqQueryParams,
+				columns: columns ? columns.split(',') : [],
+				preloadUsers: preloadUsers === 'true',
+			});
 		} catch (err) {
-			return response.badRequest(err);
+			if (err?.errno)
+				return response.badRequest(err);
+
+			return response.internalServerError(err);
 		}
 	}
 
   public async store({ request, response }: HttpContextContract) {
 		try {
 			await request.validate(RoleValidator);
-
-			const { name } = request.only(['name']);
-
-			const role = await Role.create({
-				id: name,
-				name,
-			});
-
-			return response.created(role);
-		} catch (err) {			
+		} catch (err) {
 			return response.badRequest(err);
+		}
+		
+		const { 
+			name, 
+		} = request.only([
+			'name',
+		]);
+
+		try {
+			return response.created(
+				await this.repository.persist({ name }), 
+			);
+		} catch (err) {			
+			return response.internalServerError(err);
 		}
 	}
 
-  public async show({ params, response }: HttpContextContract) {
+  public async show({ params, request, response }: HttpContextContract) {
+		const { id } = params;
+
+		const {
+			columns,
+			preloadUsers,
+		} = request.only([
+			'columns',
+			'preloadUsers',
+		]);
+
 		try {
-			const { id } = params;
-
-			const role = await Role.findOrFail(id);
-
-			return response.ok(role);
+			return await this.repository.findOrFail(id, {
+				columns: columns ? columns.split(',') : [],
+				preloadUsers: preloadUsers === 'true',
+			});
 		} catch (err) {
 			if (err.code === 'E_ROW_NOT_FOUND')
-				return response.notFound({
-					code: err.code,
-					message: 'Record not found.',
-				});
+				return response.notFound(err);
 
-			return response.badRequest(err);
+			if (err?.errno)
+				return response.badRequest(err);
+
+			return response.internalServerError(err);
 		}
 	}
 
   public async update({ params, request, response }: HttpContextContract) {
+		const { id } = params;
+
 		try {
-			const { id } = params;
-			const role = await Role.findOrFail(id);
-
 			await request.validate(RoleValidator);
+		} catch (err) {
+			return response.badRequest(err);
+		}
+		
+		const { name } = request.only(['name']);
 
-			const { name } = request.only(['name']);
-
-			role.id = name;
-			role.name = name;
-
-			await role.save();
-
-			return response.ok(role);
+		try {
+			return await this.repository.update({ 
+				id, 
+				name, 
+			});
 		} catch (err) {
 			if (err.code === 'E_ROW_NOT_FOUND')
-				return response.notFound({
-					code: err.code,
-					message: 'Record not found.',
-				});
+				return response.notFound(err);
 
-			return response.badRequest(err);
+			return response.internalServerError(err);
 		}
 	}
 
   public async destroy({ params, response }: HttpContextContract) {
+		const { id } = params;
+
 		try {
-			const { id } = params;
-
-			const role = await Role.findOrFail(id);
-
-			await role.softDelete();
-
-			return response.ok(true);
+			return await this.repository.delete(id);
 		} catch (err) {
 			if (err.code === 'E_ROW_NOT_FOUND')
-				return response.notFound({
-					code: err.code,
-					message: 'Record not found.',
-				});
+				return response.notFound(err);
 
-			return response.badRequest(err);
+			return response.internalServerError(err);
 		}
 	}
 
 	public async restore({ params, response }: HttpContextContract) {
+		const { id } = params;
+
 		try {
-			const { id } = params;
-
-			const role = await Role.findOnlyTrashedOrFail(id);
-
-			await role.restore();
-
-			return response.ok(true);
+			return await this.repository.restore(id);
 		} catch (err) {
 			if (err.code === 'E_ROW_NOT_FOUND')
-				return response.notFound({
-					code: err.code,
-					message: 'No deleted record found.',
-				});
+				return response.notFound(err);
 
-			return response.badRequest(err);
+			return response.internalServerError(err);
 		}
 	}
 }
