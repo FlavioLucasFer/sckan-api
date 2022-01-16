@@ -88,7 +88,7 @@ interface TaskRepositoryInterface {
 	labels(taskId: number): Promise<Label[]>;
 };
 
-export default class TaskRepository implements TaskRepositoryInterface {
+export default class TasksRepository implements TaskRepositoryInterface {
 	private columns: string[];
 
 	public constructor() {
