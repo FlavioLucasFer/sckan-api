@@ -23,7 +23,7 @@ export default class RolesController {
 		try {
 			return await this.repository.all({
 				...reqQueryParams,
-				columns: columns ? columns.split(',') : [],
+				columns: columns ? columns.split(',') : null,
 				preloadUsers: preloadUsers === 'true',
 			});
 		} catch (err) {
@@ -69,7 +69,7 @@ export default class RolesController {
 
 		try {
 			return await this.repository.findOrFail(id, {
-				columns: columns ? columns.split(',') : [],
+				columns: columns ? columns.split(',') : null,
 				preloadUsers: preloadUsers === 'true',
 			});
 		} catch (err) {
