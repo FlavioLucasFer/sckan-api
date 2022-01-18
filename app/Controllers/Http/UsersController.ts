@@ -26,6 +26,8 @@ export default class UsersController {
 			'trashed',
 			'trashedOnly',
 			'limit',
+			'page',
+			'pageLimit',
 			'columns',
 			'preload',
 			'withPicture',

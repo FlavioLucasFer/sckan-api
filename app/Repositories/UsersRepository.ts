@@ -106,9 +106,6 @@ export default class UsersRepository implements UsersRepositoryInterface {
 			throw err;
 		}
 
-		if (id)
-			user.id = id;
-
 		if (name)
 			user.name = name;
 
@@ -255,7 +252,7 @@ export default class UsersRepository implements UsersRepositoryInterface {
 
 		try {
 			if (params?.page)
-				return (await query.paginate(params.page, params.pageLimit || 50)).toJSON();
+				return (await query.paginate(params.page, params.pageLimit || 10)).toJSON();
 
 			return await query;
 		} catch (err) {
