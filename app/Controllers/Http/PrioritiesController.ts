@@ -1,66 +1,43 @@
 import { HttpContextContract } from '@ioc:Adonis/Core/HttpContext';
 
-import Priority from 'App/Models/Priority';
+import PrioritiesRepository from 'App/Repositories/PrioritiesRepository';
 
 import StorePriorityValidator from 'App/Validators/StorePriorityValidator';
 import UpdatePriorityValidator from 'App/Validators/UpdatePriorityValidator';
 
 export default class PrioritiesController {
-	private columns: Array<string>;
-
-	private constructor() {
-		const columns = Array.from(Priority.$columnsDefinitions, ([key]) => key);
-		columns.splice(columns.indexOf('deletedAt'), 1);
-
-		this.columns = columns;
-	}
+	private repository = new PrioritiesRepository();
 
   public async index({ request, response }: HttpContextContract) {
 		const {
-			company,
-			name,
-			color,
-			level,
-			columns = this.columns,
-			limit,
-			page,
-			pageLimit = 10,
+			columns,
+			preload,
+			trashed,
+			trashedOnly,
+			...reqQueryParams
 		} = request.only([
-			'company',
 			'name',
 			'color',
 			'level',
-			'columns',
+			'company',
+			'trashed',
+			'trashedOnly',
 			'limit',
 			'page',
 			'pageLimit',
+			'columns',
+			'preload',
 		]);
 
-		const query = Priority.query()
-			.select(typeof columns === 'string' ? columns.split(',') : columns)
-			.orderBy('level', 'desc')
-			.orderBy('name', 'asc');
-
-		if (company)
-			query.where('companyId', company);
-
-		if (name)
-			query.where('name', 'LIKE', `%${name}%`);
-			
-		if (color)
-			query.where('color', color);
-
-		if (level)
-			query.where('level', level);
-
-		if (limit)
-			query.limit(limit);
+		const preloads = preload ? preload.split(',') : [];
 
 		try {
-			if (page)
-				return (await query.paginate(page, pageLimit)).toJSON();
-
-			return await query;
+			return await this.repository.all({
+				...reqQueryParams,
+				columns: columns ? columns.split(',') : null,
+				preloadCompany: preloads.includes('company'),
+				preloadTasks: preloads.includes('tasks'),
+			});
 		} catch (err) {
 			if (err?.errno)
 				return response.badRequest(err);
@@ -76,12 +53,7 @@ export default class PrioritiesController {
 			return response.badRequest(err);			
 		}
 
-		const {
-			name,
-			color,
-			level,
-			company,
-		} = request.only([
+		const reqBody = request.only([
 			'name',
 			'color',
 			'level',
@@ -89,14 +61,9 @@ export default class PrioritiesController {
 		]);
 
 		try {
-			const priority = await Priority.create({
-				name,
-				color,
-				level,
-				companyId: company,
-			});
-
-			return response.created(priority);
+			return response.created(
+				await this.repository.persist(reqBody),
+			);
 		} catch (err) {
 			return response.internalServerError(err);
 		}
@@ -104,20 +71,25 @@ export default class PrioritiesController {
 
   public async show({ params, request, response }: HttpContextContract) {
 		const { id } = params;
+		const {
+			columns,
+			preload,
+		} = request.only([
+			'columns',
+			'preload',
+		]); 
 
-		const { columns = this.columns } = request.only(['columns']);
+		const preloads = preload ? preload.split(',') : [];
 
 		try {
-			return await Priority.query()
-				.select(typeof columns === 'string' ? columns.split(',') : columns)
-				.where('id', id)
-				.firstOrFail()
+			return await this.repository.findOrFail(id, {
+				columns: columns ? columns.split(',') : null,
+				preloadCompany: preloads.includes('company'),
+				preloadTasks: preloads.includes('tasks'),
+			});
 		} catch (err) {
 			if (err.code === 'E_ROW_NOT_FOUND')
-				return response.notFound({
-					code: err.code,
-					message: 'Record not found.',
-				});
+				return response.notFound(err);
 
 			if (err?.errno)
 				return response.badRequest(err);
@@ -128,16 +100,6 @@ export default class PrioritiesController {
 
   public async update({ params, request, response }: HttpContextContract) {
 		const { id } = params;
-		let priority: Priority;
-
-		try {
-			priority = await Priority.findOrFail(id);
-		} catch (err) {
-			return response.notFound({
-				code: err.code,
-				message: 'Record not found.',
-			});
-		}
 
 		try {
 			await request.validate(UpdatePriorityValidator);
@@ -145,80 +107,46 @@ export default class PrioritiesController {
 			return response.badRequest(err);
 		}
 
-		const {
-			name,
-			color,
-			level,
-			company,
-		} = request.only([
+		const reqBody = request.only([
 			'name',
 			'color',
 			'level',
 			'company',
 		]);
 
-		if (name)
-			priority.name = name;
-
-		if (color)
-			priority.color = color;
-
-		if (level)
-			priority.level = level;
-
-		if (company)
-			priority.companyId = company;
-
 		try {
-			await priority.save();
-
-			return priority;
+			return this.repository.update({ id, ...reqBody });
 		} catch (err) {
+			if (err.code === 'E_ROW_NOT_FOUND')
+				return response.notFound(err);
+
 			return response.internalServerError(err);
 		}
 	};
 
-  public async destroy({ params, response }: HttpContextContract) {
+	public async destroy({ params, response }: HttpContextContract) {
 		const { id } = params;
-		let priority: Priority;
 
 		try {
-			priority = await Priority.findOrFail(id);
+			return await this.repository.delete(id);
 		} catch (err) {
-			return response.notFound({
-				code: err.code,
-				message: 'Record not found.',
-			});
-		}
+			if (err.code === 'E_ROW_NOT_FOUND')
+				return response.notFound(err);
 
-		try {
-			await priority.softDelete();
-		} catch (err) {
 			return response.internalServerError(err);
 		}
+	}
 
-		return true;
-	};
-
-  public async restore({ params, response }: HttpContextContract) {
+	public async restore({ params, response }: HttpContextContract) {
 		const { id } = params;
-		let priority: any;
 
 		try {
-			priority = await Priority.findOnlyTrashedOrFail(id);
+			return await this.repository.restore(id);
 		} catch (err) {
-			return response.notFound({
-				code: err.code,
-				message: 'No deleted record found.',
-			});
-		}
+			if (err.code === 'E_ROW_NOT_FOUND')
+				return response.notFound(err);
 
-		try {
-			await priority.restore();
-		} catch (err) {
 			return response.internalServerError(err);
 		}
-
-		return true;
-	};
+	}
 }
