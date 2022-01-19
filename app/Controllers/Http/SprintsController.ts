@@ -1,39 +1,21 @@
 import { HttpContextContract } from '@ioc:Adonis/Core/HttpContext';
-import Database from '@ioc:Adonis/Lucid/Database';
+
+import SprintsRepository from 'App/Repositories/SprintsRepository';
 
 import UpdateSprintValidator from 'App/Validators/UpdateSprintValidator';
 import StoreSprintValidator from 'App/Validators/StoreSprintValidator';
-import Sprint from 'App/Models/Sprint';
 
-export default class SprintsController {
-	private columns: Array<string>;
-
-	private constructor() {
-		const columns = Array.from(Sprint.$columnsDefinitions, ([key]) => key);
-		columns.splice(columns.indexOf('deletedAt'), 1);
-
-		this.columns = columns;
-	}
+export default class SprintsController {	
+	private repository = new SprintsRepository();
 	
 	public async index({ request, response }: HttpContextContract) {
 		const {
-			project,
-			name,
-			description,
-			startsAt,
-			startsFrom,
-			endsAt,
-			endsFrom,
-			startedAt,
-			startedFrom,
-			endedAt,
-			endedFrom,
-			columns = this.columns,
-			limit,
-			page,
-			pageLimit = 10,
+			columns,
+			preload,
+			trashed,
+			trashedOnly,
+			...reqQueryParams
 		} = request.only([
-			'project',
 			'name',
 			'description',
 			'startsAt',
@@ -44,64 +26,31 @@ export default class SprintsController {
 			'startedFrom',
 			'endedAt',
 			'endedFrom',
-			'columns',
+			'project',
+			'trashed',
+			'trashedOnly',
 			'limit',
 			'page',
 			'pageLimit',
+			'columns',
+			'preload',
 		]);
 
-		const query = Sprint.query()
-			.select(typeof columns === 'string' ? columns.split(',') : columns);
-
-		if (project)
-			query.where('projectId', project);
-
-		if (name)
-			query.where('name', 'LIKE', `%${name}%`);
-
-		if (description)
-			query.where('description', 'LIKE', `%${description}%`);
-
-		if (startsAt)
-			query.where(Database.raw(`DATE_FORMAT(starts_at, '%Y-%m-%d') = '${startsAt}'`));
-
-		if (startsFrom)
-			query.where(Database.raw(`DATE_FORMAT(starts_at, '%Y-%m-%d') >= '${startsFrom}'`));
-
-		if (endsAt)
-			query.where(Database.raw(`DATE_FORMAT(ends_at, '%Y-%m-%d') = '${endsAt}'`));
-
-		if (endsFrom)
-			query.where(Database.raw(`DATE_FORMAT(ends_at, '%Y-%m-%d') >= '${endsFrom}'`));
-
-		if (startedAt)
-			query.where(Database.raw(`DATE_FORMAT(started_at, '%Y-%m-%d') = '${startedAt}'`));
-
-		if (startedFrom)
-			query.where(Database.raw(`DATE_FORMAT(started_at, '%Y-%m-%d') >= '${startedFrom}'`));		
-
-		if (endedAt)
-			query.where(Database.raw(`DATE_FORMAT(ended_at, '%Y-%m-%d') = '${endedAt}'`));
-
-		if (endedFrom)
-			query.where(Database.raw(`DATE_FORMAT(ended_at, '%Y-%m-%d') >= '${endedFrom}'`));
-
-		if (limit)
-			query.limit(limit);
-		
+		const preloads = preload ? preload.split(',') : [];
 
 		try {
-			if (page)
-				return (await query.paginate(page, pageLimit)).toJSON();
-			
-			return await query;
+			return await this.repository.all({
+				...reqQueryParams,
+				columns: columns ? columns.split(',') : null,
+				preloadProject: preloads.includes('project'),
+				preloadTasks: preloads.includes('tasks'),
+			});
 		} catch (err) {
 			if (err?.errno)
 				return response.badRequest(err);
 
 			return response.internalServerError(err);
 		}
-
 	};
 
   public async store({ request, response }: HttpContextContract) {
@@ -111,15 +60,7 @@ export default class SprintsController {
 			return response.badRequest(err);
 		}	
 
-		const {
-			name,
-			description,
-			startsAt,
-			endsAt,
-			startedAt,
-			endedAt,
-			project,
-		} = request.only([
+		const reqBody = request.only([
 			'name',
 			'description',
 			'startsAt',
@@ -130,17 +71,9 @@ export default class SprintsController {
 		]);
 
 		try {
-			const sprint = await Sprint.create({
-				name,
-				description,
-				startsAt,
-				endsAt,
-				startedAt,
-				endedAt,
-				projectId: project,
-			});
-
-			return response.created(sprint);
+			return response.created(
+				await this.repository.persist(reqBody),
+			);
 		} catch (err) {
 			return response.internalServerError(err);
 		}
@@ -148,20 +81,25 @@ export default class SprintsController {
 
   public async show({ params, request, response }: HttpContextContract) {
 		const { id } = params;
+		const { 
+			columns,
+			preload,
+		} = request.only([
+			'columns',
+			'preload',
+		]); 
 
-		const { columns = this.columns } = request.only(['columns']); 
+		const preloads = preload ? preload.split(',') : [];
 
 		try {
-			return await Sprint.query()
-				.select(typeof columns === 'string' ? columns.split(',') : columns)
-				.where('id', id)
-				.firstOrFail()
+			return await this.repository.findOrFail(id, {
+				columns: columns ? columns.split(',') : null,
+				preloadProject: preloads.includes('project'),
+				preloadTasks: preloads.includes('tasks'),
+			});
 		} catch (err) {
 			if (err.code === 'E_ROW_NOT_FOUND')
-				return response.notFound({
-					code: err.code,
-					message: 'Record not found.',
-				});
+				return response.notFound(err);
 
 			if (err?.errno)
 				return response.badRequest(err);
@@ -172,16 +110,6 @@ export default class SprintsController {
 
   public async update({ params, request, response }: HttpContextContract) {
 		const { id } = params;
-		let sprint: Sprint;
-
-		try {
-			sprint = await Sprint.findOrFail(id);
-		} catch (err) {
-			return response.notFound({
-				code: err.code,
-				message: 'Record not found.',
-			});
-		}
 
 		try {
 			await request.validate(UpdateSprintValidator);
@@ -189,15 +117,7 @@ export default class SprintsController {
 			return response.badRequest(err);
 		}
 
-		const {
-			name,
-			description,
-			startsAt,
-			endsAt,
-			startedAt,
-			endedAt,
-			project,
-		} = request.only([
+		const reqBody = request.only([
 			'name',
 			'description',
 			'startsAt',
@@ -207,77 +127,39 @@ export default class SprintsController {
 			'project',
 		]);
 
-		if (name)
-			sprint.name = name;
-
-		if (description)
-			sprint.description = description;
-
-		if (startsAt)
-			sprint.startsAt = startsAt;
-
-		if (endsAt)
-			sprint.endsAt = endsAt;
-
-		if (startedAt)
-			sprint.startedAt = startedAt;
-
-		if (endedAt)
-			sprint.endedAt = endedAt;
-
-		if (project)
-			sprint.projectId = project;
-
 		try {
-			await sprint.save();
-
-			return sprint;
+			return this.repository.update({ id, ...reqBody });
 		} catch (err) {
+			if (err.code === 'E_ROW_NOT_FOUND')
+				return response.notFound(err);
+
 			return response.internalServerError(err);
 		}
 	};
 
-  public async destroy({ params, response }: HttpContextContract) {
+	public async destroy({ params, response }: HttpContextContract) {
 		const { id } = params;
-		let sprint: Sprint;
 
 		try {
-			sprint = await Sprint.findOrFail(id);
+			return await this.repository.delete(id);
 		} catch (err) {
-			return response.notFound({
-				code: err.code,
-				message: 'Record not found.',
-			});
-		}
+			if (err.code === 'E_ROW_NOT_FOUND')
+				return response.notFound(err);
 
-		try {
-			await sprint.softDelete();
-		} catch (err) {
 			return response.internalServerError(err);
 		}
-
-		return true;
 	}
 
 	public async restore({ params, response }: HttpContextContract) {
 		const { id } = params;
-		let sprint: any;
 
 		try {
-			sprint = await Sprint.findOnlyTrashedOrFail(id);
+			return await this.repository.restore(id);
 		} catch (err) {
-			return response.notFound({
-				code: err.code,
-				message: 'No deleted record found.',
-			});
-		}
+			if (err.code === 'E_ROW_NOT_FOUND')
+				return response.notFound(err);
 
-		try {
-			await sprint.restore();
-		} catch (err) {
 			return response.internalServerError(err);
 		}
-
-		return true;
 	}
 }

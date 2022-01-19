@@ -1,9 +1,11 @@
 import { DateTime } from 'luxon';
-import { BelongsTo, belongsTo, column } from '@ioc:Adonis/Lucid/Orm';
+import { BelongsTo, belongsTo, column, HasMany, hasMany } from '@ioc:Adonis/Lucid/Orm';
 
 import SoftDeleteBaseModel from 'App/Models/SoftDeleteBaseModel';
-import Serialize from 'App/Helpers/Serialize';
 import Project from 'App/Models/Project';
+import Task from 'App/Models/Task';
+
+import Serialize from 'App/Helpers/Serialize';
 
 export default class Sprint extends SoftDeleteBaseModel {
   @column({ isPrimary: true })
@@ -60,6 +62,23 @@ export default class Sprint extends SoftDeleteBaseModel {
 	@column.dateTime({ serializeAs: null })
 	public deletedAt: DateTime;
 
-	@belongsTo(() => Project, { foreignKey: 'projectId' })
+	@belongsTo(() => Project, {
+		onQuery: query => {
+			query.select([
+				'id',
+				'name',
+				'description',
+				'contractorName',
+				'cloneUrl',
+				'companyId',
+				'responsibleId',
+				'createdAt',
+				'updatedAt',
+			]);
+		},
+	})
 	public project: BelongsTo<typeof Project>;
+
+	@hasMany(() => Task)
+	public tasks: HasMany<typeof Task>;
 }
