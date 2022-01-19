@@ -5,10 +5,6 @@ import {
 	column, 
 	HasMany, 
 	hasMany, 
-	HasOne, 
-	hasOne, 
-	LucidModel, 
-	ModelAdapterOptions, 
 } from '@ioc:Adonis/Lucid/Orm';
 
 import SoftDeleteBaseModel from 'App/Models/SoftDeleteBaseModel';
@@ -34,7 +30,7 @@ export default class Project extends SoftDeleteBaseModel {
 	public cloneUrl: string;
 
 	@column()
-	public logo: Blob | null;
+	public logo: Buffer | null;
 
 	@column({ serializeAs: 'companyId' })
 	public companyId: number;
@@ -60,63 +56,37 @@ export default class Project extends SoftDeleteBaseModel {
 	@column.dateTime({ serializeAs: null })
 	public deletedAt: DateTime;
 
-	@belongsTo(() => Company, { foreignKey: 'companyId' })
-	public company: BelongsTo<typeof Company>;
-
-	@hasOne(() => User, { foreignKey: 'responsibleId' })
-	public responsible: HasOne<typeof User>;
-
-	@hasMany(() => Sprint, { foreignKey: 'projectId' })
-	public sprints: HasMany<typeof Sprint>;
-
-	static async customAll<T extends LucidModel>(
-		this: T,
-		withLogo: boolean = false,
-		options?: ModelAdapterOptions,
-	): Promise<InstanceType<T>[]> {
-		const query = this.query(options)
-			.select([
+	@belongsTo(() => Company, {
+		onQuery: query => {
+			query.select([
 				'id',
-				'companyId',
-				'responsibleId',
 				'name',
-				'description',
-				'contractorName',
-				'cloneUrl',
+				'tradeName',
+				'email',
 				'createdAt',
 				'updatedAt',
 			]);
+		},
+	})
+	public company: BelongsTo<typeof Company>;
 
-
-		if (withLogo)
-			query.select('logo');
-
-		return await query;
-	}
-
-	static async customFindOrFail<T extends LucidModel>(
-		this: T,
-		value: any,
-		withLogo: boolean = false,
-		options?: ModelAdapterOptions
-	): Promise<InstanceType<T>> {
-		const query = this.query(options)
-			.select([
+	@belongsTo(() => User, { 
+		foreignKey: 'responsibleId',
+		onQuery: query => {
+			query.select([
 				'id',
-				'companyId',
-				'responsibleId',
 				'name',
-				'description',
-				'contractorName',
-				'cloneUrl',
+				'username',
+				'email',
+				'companyId',
+				'roleId',
 				'createdAt',
 				'updatedAt',
-			])
-			.where('id', value);
+			]);
+		}, 
+	})
+	public responsible: BelongsTo<typeof User>;
 
-		if (withLogo)
-			query.select('logo');
-
-		return await query.firstOrFail();
-	}
+	@hasMany(() => Sprint)
+	public sprints: HasMany<typeof Sprint>;
 }
