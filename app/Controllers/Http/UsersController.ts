@@ -1,193 +1,201 @@
 import { HttpContextContract } from '@ioc:Adonis/Core/HttpContext';
 import getStream from 'get-stream';
 
-import User from 'App/Models/User';
 import StoreUserValidator from 'App/Validators/StoreUserValidator';
 import UpdateUserValidator from 'App/Validators/UpdateUserValidator';
 
-export default class UsersController {
-  public async index({ request, response }: HttpContextContract) {
-		try {
-			const { withPicture } = request.only(['withPicture']);
+import UsersRepository from 'App/Repositories/UsersRepository';
 
-			return response.ok(await User.customAll(withPicture));
+export default class UsersController {
+  private repository = new UsersRepository();
+	
+	public async index({ request, response }: HttpContextContract) {
+		const {
+			columns,
+			preload,
+			trashed,
+			trashedOnly,
+			withPicture,
+			...reqQueryParams
+		} = request.only([
+			'name',
+			'username',
+			'email',
+			'company',
+			'role',
+			'trashed',
+			'trashedOnly',
+			'limit',
+			'page',
+			'pageLimit',
+			'columns',
+			'preload',
+			'withPicture',
+		]);
+		
+		const preloads = preload ? preload.split(',') : [];
+
+		try {
+			return await this.repository.all({
+				...reqQueryParams,
+				columns: columns ? columns.split(',') : null,
+				preloadCompany: preloads.includes('company'),
+				preloadRole: preloads.includes('role'),
+				preloadProjects: preloads.includes('projects'),
+				preloadTasks: preloads.includes('tasks'),
+				trashed: trashed === 'true',
+				trashedOnly: trashedOnly === 'true',
+				withPicture: withPicture === 'true',
+			});
 		} catch (err) {
-			return response.badRequest(err);
+			if (err?.errno)
+				return response.badRequest(err);
+
+			return response.internalServerError(err);
 		}
 	}
 
   public async store({ request, response }: HttpContextContract) {
+		const reqBody = request.only([
+			'name',
+			'username',
+			'password',
+			'email',
+			'company',
+			'role',
+		]); 
+		
 		try {
 			await request.validate(StoreUserValidator);
-
-			const {
-				company,
-				role,
-				name,
-				username,
-				password,
-				email,
-			} = request.only([
-				'company',
-				'role',
-				'name',
-				'username',
-				'password',
-				'email',
-			]); 
-
-			const user = await User.create({
-				companyId: company,
-				roleId: role,
-				name,
-				username,
-				password,
-				email,
-			});
-
-			return response.created(user);
 		} catch (err) {
 			return response.badRequest(err);
+		}
+
+		try {
+			return response.created(
+				await this.repository.persist(reqBody),
+			);
+		} catch (err) {
+			return response.internalServerError(err);
 		}
 	}
 
   public async show({ params, request, response }: HttpContextContract) {
-		try {
-			const { id } = params;
-			const { withPicture } = request.only(['withPicture']);
+		const { id } = params;
+		const { 
+			columns,
+			preload,
+			withPicture, 
+		} = request.only([
+			'columns',
+			'preload',
+			'withPicture',
+		]);
 
-			return response.ok(await User.customFindOrFail(id, withPicture));
+		const preloads = preload ? preload.split(',') : [];
+		
+		try {
+			return await this.repository.findOrFail(id, {
+				columns: columns ? columns.split(',') : null,
+				withPicture: withPicture === 'true',
+				preloadCompany: preloads.includes('company'),
+				preloadRole: preloads.includes('role'),
+				preloadProjects: preloads.includes('projects'),
+				preloadTasks: preloads.includes('tasks'),
+			});
 		} catch (err) {
 			if (err.code === 'E_ROW_NOT_FOUND')
-				return response.notFound({
-					code: err.code,
-					message: 'Record not found.',
-				});
+				return response.notFound(err);
 
-			return response.badRequest(err);
+			if (err?.errno)
+				return response.badRequest(err);
+
+			return response.internalServerError(err);
 		}
 	}
 
 	public async picture({ params, request, response }: HttpContextContract) {
-		try {
-			const { id } = params;
-			let picture: Buffer | null = null;
+		const { id } = params;
+		let picture: Buffer | null = null;
 
+		try {
 			request.multipart.onFile('picture', {
 				size: '10mb',
 				extnames: ['jpg', 'png', 'jpeg'],
 			}, async file => {
 				picture = await getStream.buffer(file);
 			});
+		} catch (err) {
+			return response.badRequest(err);
+		}
 
+		try {
 			await request.multipart.process();
+		} catch (err) {
+			return response.internalServerError(err);
+		}
 
-			const user = await User.findOrFail(id);
-
-			user.picture = picture;
-
-			await user.save();
-
-			return response.ok(user);
+		try {
+			return await this.repository.picture(id, picture);
 		} catch (err) {
 			if (err.code === 'E_ROW_NOT_FOUND')
-				return response.notFound({
-					code: err.code,
-					message: 'Record not found.',
-				});
+				return response.notFound(err);
 
-			return response.badRequest(err);
+			return response.internalServerError(err);
 		}
 	}
 
   public async update({ params, request, response }: HttpContextContract) {
+		const { id } = params;
+
 		try {
-			const { id } = params;
-
-			const user = await User.customFindOrFail(id, false);
-
 			await request.validate(UpdateUserValidator);
+		} catch (err) {
+			return response.badRequest(err);
+		}
 
-			const {
-				company,
-				role,
-				name,
-				username,
-				password,
-				email,
-			} = request.only([
-				'company',
-				'role',
-				'name',
-				'username',
-				'password',
-				'email',
-			]); 
-
-			if (company)
-				user.companyId = company;
-			if (role)
-				user.roleId = role;
-			if (name)
-				user.name = name;
-			if (username)
-				user.username = username;
-			if (password)
-				user.password = password;
-			if (email)
-				user.email = email;
-
-			await user.save();
-
-			return response.ok(user);
+		const reqBody = request.only([
+			'name',
+			'username',
+			'password',
+			'email',
+			'company',
+			'role',
+		]);
+		
+		try {
+			return await this.repository.update({ id, ...reqBody });
 		} catch (err) {
 			if (err.code === 'E_ROW_NOT_FOUND')
-				return response.notFound({
-					code: err.code,
-					message: 'Record not found.',
-				});
+				return response.notFound(err);
 
-			return response.badRequest(err);
+			return response.internalServerError(err);
 		}
 	}
 
   public async destroy({ params, response }: HttpContextContract) {
+		const { id } = params;
+
 		try {
-			const { id } = params;
-
-			const user = await User.findOrFail(id);
-
-			await user.softDelete();
-
-			return response.ok(true);
+			return await this.repository.delete(id);
 		} catch (err) {
 			if (err.code === 'E_ROW_NOT_FOUND')
-				return response.notFound({
-					code: err.code,
-					message: 'Record not found.',
-				});
+				return response.notFound(err);
 
-			return response.badRequest(err);
+			return response.internalServerError(err);
 		}
 	}
 
 	public async restore({ params, response }: HttpContextContract) {
+		const { id } = params;
+
 		try {
-			const { id } = params;
-
-			const user = await User.findOnlyTrashedOrFail(id);
-
-			await user.restore();
-
-			return response.ok(true);
+			return await this.repository.restore(id);
 		} catch (err) {
 			if (err.code === 'E_ROW_NOT_FOUND')
-				return response.notFound({
-					code: err.code,
-					message: 'No deleted record found.',
-				});
+				return response.notFound(err);
 
-			return response.badRequest(err);
+			return response.internalServerError(err);
 		}
 	}
 }
