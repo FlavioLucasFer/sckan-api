@@ -156,7 +156,7 @@ export default class CompaniesRepository implements CompaniesRepositoryInterface
 
 	public async all(params?: AllQueryParams): Promise<Company[] | { meta: any; data: ModelObject[]; }> {
 		const query = Company.query()
-			.select(params?.columns || this.columns)
+			.select(params?.columns || this.columns);
 
 		if (params) {
 			const {

@@ -1,70 +1,52 @@
 import { HttpContextContract } from '@ioc:Adonis/Core/HttpContext';
 import getStream from 'get-stream';
 
+import ProjectsRepository from 'App/Repositories/ProjectsRepository';
+
 import UpdateProjectValidator from 'App/Validators/UpdateProjectValidator';
 import StoreProjectValidator from 'App/Validators/StoreProjectValidator';
-import Project from 'App/Models/Project';
 
 export default class ProjectsController {
-	private columns: Array<string>;
-
-	private constructor() {
-		const columns = Array.from(Project.$columnsDefinitions, ([key]) => key);
-		columns.splice(columns.indexOf('logo'), 1);
-		columns.splice(columns.indexOf('deletedAt'), 1);
-
-		this.columns = columns;
-	}
+	private repository = new ProjectsRepository();
 
   public async index({ request, response }: HttpContextContract) {
 		const {
-			company,
-			responsible,
-			name,
-			description,
+			columns,
+			preload,
+			trashed,
+			trashedOnly,
 			withLogo,
-			columns = this.columns,
-			limit,
-			page,
-			pageLimit = 10,
+			...reqQueryParams
 		} = request.only([
-			'company',
-			'responsible',
 			'name',
 			'description',
-			'withLogo',
-			'columns',
+			'contractor',
+			'cloneUrl',
+			'company',
+			'responsible',
+			'trashed',
+			'trashedOnly',
 			'limit',
 			'page',
 			'pageLimit',
+			'columns',
+			'preload',
+			'withLogo',
 		]);
-		
-		const query = Project.query()
-			.select(typeof columns === 'string' ? columns.split(',') : columns);
-		
-		if (withLogo)
-			query.select('logo');
 
-		if (company)
-			query.where('company_id', company);
-		
-		if (responsible)
-			query.where('responsible_id', responsible);
-
-		if (name)
-			query.where('name', 'LIKE', `%${name}%`);
-		
-		if (description)
-			query.where('description', 'LIKE', `%${description}%`);
-
-		if (limit)
-			query.limit(limit);
+		const preloads = preload ? preload.split(',') : [];
 
 		try {
-			if (page) 
-				return (await query.paginate(page, pageLimit)).toJSON();
-			
-			return await query;
+			return await this.repository.all({
+				...reqQueryParams,
+				columns: columns ? columns.split(',') : null,
+				preloadCompany: preloads.includes('company'),
+				preloadResponsible: preloads.includes('responsible'),
+				preloadSprints: preloads.includes('sprints'),
+				trashed: trashed === 'true',
+				trashedOnly: trashedOnly === 'true',
+				withLogo: withLogo === 'true',
+			});
 		} catch (err) {
 			if (err?.errno)
 				return response.badRequest(err);
@@ -80,33 +62,19 @@ export default class ProjectsController {
 			return response.badRequest(err);
 		}
 
-		const {
-			name,
-			company,
-			responsible,
-			description,
-			contractorName,
-			cloneUrl,
-		} = request.only([
+		const reqBody = request.only([
 			'name',
-			'company',
-			'responsible',
 			'description',
 			'contractorName',
 			'cloneUrl',
+			'company',
+			'responsible',
 		]);
 
 		try {
-			const project = await Project.create({
-				name,
-				companyId: company,
-				responsibleId: responsible,
-				description,
-				contractorName,
-				cloneUrl,
-			});
-
-			return response.created(project);
+			return response.created(
+				await this.repository.persist(reqBody),
+			);
 		} catch (err) {
 			return response.internalServerError(err);
 		}
@@ -114,30 +82,29 @@ export default class ProjectsController {
 
   public async show({ params, request, response }: HttpContextContract) {
 		const { id } = params;
-		
 		const {
-			columns = this.columns,
+			columns,
+			preload,
 			withLogo,
 		} = request.only([
 			'columns',
+			'preload',
 			'withLogo',
 		]);
 
-		const query = Project.query()
-			.select(typeof columns === 'string' ? columns.split(',') : columns)
-			.where('id', id);
-		
-		if (withLogo)
-			query.select('logo');
+		const preloads = preload ? preload.split(',') : [];
 		
 		try {
-			return await query.firstOrFail();
+			return await this.repository.findOrFail(id, {
+				columns: columns ? columns.split(',') : null,
+				withLogo: withLogo === 'true',
+				preloadCompany: preloads.includes('company'),
+				preloadResponsible: preloads.includes('responsible'),
+				preloadSprints: preloads.includes('sprints'),
+			});
 		} catch (err) {
 			if (err.code === 'E_ROW_NOT_FOUND')
-				return response.notFound({
-					code: err.code,
-					message: 'Record not found.',
-				});
+				return response.notFound(err);
 
 			if (err?.errno)
 				return response.badRequest(err);
@@ -148,16 +115,6 @@ export default class ProjectsController {
 
   public async update({ params, request, response }: HttpContextContract) {
 		const { id } = params;
-		let project: Project;
-
-		try {
-			project = await Project.customFindOrFail(id);
-		} catch (err) {
-			return response.notFound({
-				code: err.code,
-				message: 'Record not found.',
-			});
-		}
 
 		try {
 			request.validate(UpdateProjectValidator);
@@ -165,14 +122,7 @@ export default class ProjectsController {
 			return response.badRequest(err);
 		}
 
-		const {
-			name,
-			company,
-			responsible,
-			description,
-			contractorName,
-			cloneUrl,
-		} = request.only([
+		const reqBody = request.only([
 			'name',
 			'company',
 			'responsible',
@@ -181,58 +131,30 @@ export default class ProjectsController {
 			'cloneUrl',
 		]);
 
-		if (name)
-			project.name = name;
-
-		if (company)
-			project.companyId = company;
-		
-		if (responsible)
-			project.responsibleId = responsible;
-
-		if (description)
-			project.description = description;
-		
-		if (contractorName)
-			project.contractorName = contractorName;
-
-		if (cloneUrl)
-			project.cloneUrl = cloneUrl;
-
 		try {
-			await project.save();
-
-			return project;
+			return this.repository.update({ id, ...reqBody });
 		} catch (err) {
+			if (err.code === 'E_ROW_NOT_FOUND')
+				return response.notFound(err);
+
 			return response.internalServerError(err);
 		}
 	};
 
 	public async logo({ params, request, response }: HttpContextContract) {
 		const { id } = params;
-		
-		let project: Project;
 		let logo: Buffer | null = null;
 
 		try {
-			project = await Project.findOrFail(id);
-		} catch (err) {
-			return response.notFound({
-				code: err.code,
-				message: 'Record not found.',
-			});
-		}
-
-		request.multipart.onFile('logo', {
-			size: '5mb',
-			extnames: ['jpg', 'png', 'jpeg'],
-		}, async file => {
-			try {
+			request.multipart.onFile('logo', {
+				size: '2mb',
+				extnames: ['jpg', 'png', 'jpeg'],
+			}, async file => {
 				logo = await getStream.buffer(file);
-			} catch (err) {
-				return response.badRequest(err);
-			}
-		});
+			});
+		} catch (err) {
+			return response.badRequest(err);
+		}
 
 		try {
 			await request.multipart.process();
@@ -240,61 +162,39 @@ export default class ProjectsController {
 			return response.internalServerError(err);
 		}
 
-		project.logo = logo;
-
 		try {
-			await project.save();
+			return await this.repository.logo(id, logo);
 		} catch (err) {
-			if (err?.errno)
-				return response.badRequest(err);
+			if (err.code === 'E_ROW_NOT_FOUND')
+				return response.notFound(err);
 
 			return response.internalServerError(err);
 		}
-
-		return true;
 	}
 
-  public async destroy({ params, response }: HttpContextContract) {
+	public async destroy({ params, response }: HttpContextContract) {
 		const { id } = params;
-		let project: Project;
 
 		try {
-			project = await Project.customFindOrFail(id);
+			return await this.repository.delete(id);
 		} catch (err) {
-			return response.notFound({
-				code: err.code,
-				message: 'Record not found.',
-			});
-		}
-		
-		try {
-			await project.softDelete();
-		} catch (err) {
-			return response.internalServerError(err);	
-		}
+			if (err.code === 'E_ROW_NOT_FOUND')
+				return response.notFound(err);
 
-		return true;
-	};
+			return response.internalServerError(err);
+		}
+	}
 
 	public async restore({ params, response }: HttpContextContract) {
 		const { id } = params;
-		let project: any;
 
 		try {
-			project = await Project.findOnlyTrashedOrFail(id);
+			return await this.repository.restore(id);
 		} catch (err) {
-			return response.notFound({
-				code: err.code,
-				message: 'No deleted record found.',
-			});
-		}
+			if (err.code === 'E_ROW_NOT_FOUND')
+				return response.notFound(err);
 
-		try {
-			await project.restore();
-		} catch (err) {
 			return response.internalServerError(err);
 		}
-
-		return true;
-	};
+	}
 }
