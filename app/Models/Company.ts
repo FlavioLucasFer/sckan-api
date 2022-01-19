@@ -2,8 +2,6 @@ import {
 	column, 
 	HasMany, 
 	hasMany, 
-	LucidModel, 
-	ModelAdapterOptions,
 } from '@ioc:Adonis/Lucid/Orm';
 import { DateTime } from 'luxon';
 
@@ -12,6 +10,7 @@ import Priority from 'App/Models/Priority';
 import Project from 'App/Models/Project';
 import Status from 'App/Models/Status';
 import Label from 'App/Models/Label';
+import User from 'App/Models/User';
 
 import Serialize from 'App/Helpers/Serialize';
 
@@ -49,50 +48,45 @@ export default class Company extends SoftDeleteBaseModel {
 	@column.dateTime({ serializeAs: null })
 	public deletedAt: DateTime;
 
-	@hasMany(() => Project, { foreignKey: 'companyId' })
-	public projects: HasMany<typeof Project>;
-
-	@hasMany(() => Label, { foreignKey: 'companyId' })
-	public labels: HasMany<typeof Label>;
-
-	@hasMany(() => Priority, { foreignKey: 'companyId' })
-	public priorities: HasMany<typeof Priority>;
-
-	@hasMany(() => Status, { foreignKey: 'companyId' })
-	public statuses: HasMany<typeof Status>;
-
-	static async customAll<T extends LucidModel>(this: T, withLogo: boolean = false, options?: ModelAdapterOptions): Promise<InstanceType<T>[]> {
-		const query = this.query(options)
-			.select([
+	@hasMany(() => User, {
+		onQuery: query => {
+			query.select([
 				'id',
 				'name',
-				'tradeName',
+				'username',
 				'email',
+				'companyId',
+				'roleId',
 				'createdAt',
 				'updatedAt',
 			]);
+		},
+	})
+	public users: HasMany<typeof User>;
 
-		if (withLogo)
-			query.select('logo');
-
-		return await query;
-	}
-
-	static async customFindOrFail<T extends LucidModel>(this: T, value: any, withLogo: boolean = false, options?: ModelAdapterOptions): Promise<InstanceType<T>> {
-		const query = this.query(options)
-			.select([
+	@hasMany(() => Project, {
+		onQuery: query => {
+			query.select([
 				'id',
 				'name',
-				'tradeName',
-				'email',
+				'description',
+				'contractorName',
+				'cloneUrl',
+				'companyId',
+				'responsibleId',
 				'createdAt',
 				'updatedAt',
-			])
-			.where('id', value);
+			]);
+		},
+	})
+	public projects: HasMany<typeof Project>;
 
-		if (withLogo)
-			query.select('logo');
+	@hasMany(() => Label)
+	public labels: HasMany<typeof Label>;
 
-		return await query.firstOrFail();
-	}
+	@hasMany(() => Status)
+	public statuses: HasMany<typeof Status>;
+
+	@hasMany(() => Priority)
+	public priorities: HasMany<typeof Priority>;
 }

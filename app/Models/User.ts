@@ -67,6 +67,8 @@ export default class User extends SoftDeleteBaseModel {
 				'name',
 				'tradeName',
 				'email',
+				'createdAt',
+				'updatedAt',
 			]);
 		},
 	})
@@ -86,6 +88,8 @@ export default class User extends SoftDeleteBaseModel {
 				'description',
 				'contractorName',
 				'cloneUrl',
+				'createdAt',
+				'updatedAt',
 			]);
 		},
 	})
