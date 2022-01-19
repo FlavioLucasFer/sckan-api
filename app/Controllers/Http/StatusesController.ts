@@ -1,64 +1,45 @@
 import { HttpContextContract } from '@ioc:Adonis/Core/HttpContext';
 
-import Status from 'App/Models/Status';
+import StatusesRepository from 'App/Repositories/StatusesRepository';
 
 import StoreStatusValidator from 'App/Validators/StoreStatusValidator';
 import UpdateStatusValidator from 'App/Validators/UpdateStatusValidator';
 
 export default class StatusesController {
-	private columns: Array<string>;
-
-	private constructor() {
-		const columns = Array.from(Status.$columnsDefinitions, ([key]) => key);
-		columns.splice(columns.indexOf('deletedAt'), 1);
-
-		this.columns = columns;
-	}
+	private repository = new StatusesRepository();
 	
 	public async index({ request, response }: HttpContextContract) {
 		const {
-			company,
-			name,
-			previousStatus,
-			nextStatus,
-			columns = this.columns,
-			limit,
-			page,
-			pageLimit = 10,
+			columns,
+			preload,
+			trashed,
+			trashedOnly,
+			...reqQueryParams
 		} = request.only([
-			'company',
 			'name',
 			'previousStatus',
 			'nextStatus',
-			'columns',
+			'company',
+			'trashed',
+			'trashedOnly',
 			'limit',
 			'page',
 			'pageLimit',
+			'columns',
+			'preload',
 		]);
 
-		const query = Status.query()
-			.select(typeof columns === 'string' ? columns.split(',') : columns);
-
-		if (company)
-			query.where('companyId', company)
-
-		if (name)
-			query.where('name', 'LIKE', `%${name}%`)
-
-		if (previousStatus)
-			query.where('previousStatusId', previousStatus)
-
-		if (nextStatus)
-			query.where('nextStatusId', nextStatus)
-
-		if (limit)
-			query.limit(limit);
+		const preloads = preload ? preload.split(',') : [];
 
 		try {
-			if (page)
-				return (await query.paginate(page, pageLimit)).toJSON();
-
-			return await query;
+			return await this.repository.all({
+				...reqQueryParams,
+				columns: columns ? columns.split(',') : null,
+				preloadCompany: preloads.includes('company'),
+				preloadPreviousStatus: preloads.includes('previousStatus'),
+				preloadNextStatus: preloads.includes('nextStatus'),
+				preloadTasks: preloads.includes('tasks'),
+			});
 		} catch (err) {
 			if (err?.errno)
 				return response.badRequest(err);
@@ -74,12 +55,7 @@ export default class StatusesController {
 			return response.badRequest(err);
 		}
 
-		const {
-			name,
-			previousStatus,
-			nextStatus,
-			company,
-		} = request.only([
+		const reqBody = request.only([
 			'name',
 			'previousStatus',
 			'nextStatus',
@@ -87,14 +63,9 @@ export default class StatusesController {
 		]);
 
 		try {
-			const status = await Status.create({
-				name,
-				previousStatusId: previousStatus,
-				nextStatusId: nextStatus,
-				companyId: company,
-			});
-
-			return response.created(status);
+			return response.created(
+				await this.repository.persist(reqBody),
+			);
 		} catch (err) {
 			return response.internalServerError(err);
 		}
@@ -102,20 +73,27 @@ export default class StatusesController {
 
   public async show({ params, request, response }: HttpContextContract) {
 		const { id } = params;
+		const {
+			columns,
+			preload,
+		} = request.only([
+			'columns',
+			'preload',
+		]); 
 
-		const { columns = this.columns } = request.only(['columns']);
+		const preloads = preload ? preload.split(',') : [];
 
 		try {
-			return await Status.query()
-				.select(typeof columns === 'string' ? columns.split(',') : columns)
-				.where('id', id)
-				.firstOrFail()
+			return await this.repository.findOrFail(id, {
+				columns: columns ? columns.split(',') : null,
+				preloadCompany: preloads.includes('company'),
+				preloadPreviousStatus: preloads.includes('previousStatus'),
+				preloadNextStatus: preloads.includes('nextStatus'),
+				preloadTasks: preloads.includes('tasks'),
+			});
 		} catch (err) {
 			if (err.code === 'E_ROW_NOT_FOUND')
-				return response.notFound({
-					code: err.code,
-					message: 'Record not found.',
-				});
+				return response.notFound(err);
 
 			if (err?.errno)
 				return response.badRequest(err);
@@ -126,16 +104,6 @@ export default class StatusesController {
 
   public async update({ params, request, response }: HttpContextContract) {
 		const { id } = params;
-		let status: Status;
-
-		try {
-			status = await Status.findOrFail(id);
-		} catch (err) {
-			return response.notFound({
-				code: err.code,
-				message: 'Record not found.',
-			});
-		}
 
 		try {
 			await request.validate(UpdateStatusValidator);
@@ -143,80 +111,46 @@ export default class StatusesController {
 			return response.badRequest(err);
 		}
 
-		const {
-			name,
-			previousStatus,
-			nextStatus,
-			company,
-		} = request.only([
+		const reqBody = request.only([
 			'name',
 			'previousStatus',
 			'nextStatus',
 			'company'
 		]);
 
-		if (name)
-			status.name = name;
-
-		if (previousStatus)
-			status.previousStatusId = previousStatus;
-
-		if (nextStatus)
-			status.nextStatusId = nextStatus;
-
-		if (company)
-			status.companyId = company;
-
 		try {
-			await status.save();
-
-			return status;
+			return this.repository.update({ id, ...reqBody });
 		} catch (err) {
+			if (err.code === 'E_ROW_NOT_FOUND')
+				return response.notFound(err);
+
 			return response.internalServerError(err);
 		}
 	};
 
-  public async destroy({ params, response }: HttpContextContract) {
+	public async destroy({ params, response }: HttpContextContract) {
 		const { id } = params;
-		let status: Status;
 
 		try {
-			status = await Status.findOrFail(id);
+			return await this.repository.delete(id);
 		} catch (err) {
-			return response.notFound({
-				code: err.code,
-				message: 'Record not found.',
-			});
-		}
+			if (err.code === 'E_ROW_NOT_FOUND')
+				return response.notFound(err);
 
-		try {
-			await status.softDelete();
-		} catch (err) {
 			return response.internalServerError(err);
 		}
+	}
 
-		return true;
-	};
-
-  public async restore({ params, response }: HttpContextContract) {
+	public async restore({ params, response }: HttpContextContract) {
 		const { id } = params;
-		let status: any;
 
 		try {
-			status = await Status.findOnlyTrashedOrFail(id);
+			return await this.repository.restore(id);
 		} catch (err) {
-			return response.notFound({
-				code: err.code,
-				message: 'No deleted record found.',
-			});
-		}
+			if (err.code === 'E_ROW_NOT_FOUND')
+				return response.notFound(err);
 
-		try {
-			await status.restore();
-		} catch (err) {
 			return response.internalServerError(err);
 		}
-
-		return true;
-	};
+	}
 }
