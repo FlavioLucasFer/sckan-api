@@ -1,6 +1,9 @@
+import HttpContext from '@ioc:Adonis/Core/HttpContext';
+import Hash from '@ioc:Adonis/Core/Hash';
 import { ModelObject } from "@ioc:Adonis/Lucid/Orm";
 
 import User from "App/Models/User";
+import { AuthContract } from '@ioc:Adonis/Addons/Auth';
 
 export type PersistUserFields = {
 	name: string,
@@ -43,12 +46,22 @@ export type AllQueryParams = FindOrFailQueryParams & {
 	pageLimit?: number,
 };
 
+export type SerializedAccessToken = { 
+	type: "bearer"; 
+	token: string; 
+	expires_at?: string | undefined; 
+	expires_in?: number | undefined; 
+};
+
 interface UsersRepositoryInterface {
 	persist(fields: PersistUserFields): Promise<User>;
 	update(fields: UpdateUserFields): Promise<User>;
 	picture(id: number, picture: Buffer | null): Promise<User>;
 	delete(id: number): Promise<boolean>;
 	restore(id: number): Promise<boolean>;
+	login(username: string, password: string): Promise<SerializedAccessToken | undefined>;
+	logout(): Promise<{ revoked: boolean }>
+	loggedUser(): User | undefined;
 	all(params?: AllQueryParams): Promise<User[] | { meta: any; data: ModelObject[]; }>;
 	findOrFail(id: number, params?: FindOrFailQueryParams): Promise<User>;
 };
@@ -187,6 +200,97 @@ export default class UsersRepository implements UsersRepositoryInterface {
 		} catch (err) {
 			throw err;
 		}
+	}
+
+	public async login(username: string, password: string): Promise<SerializedAccessToken | undefined> {
+		let auth: AuthContract;
+		
+		try {
+			auth = HttpContext.getOrFail().auth;
+		} catch (err) {
+			throw {
+				code: 'INTERNAL_SERVER_ERR',
+				message: err,
+			};
+		}
+		
+		let user: User;
+		
+		const query = User.query()
+			.select([
+				'id',
+				'password',
+			])
+			.where('username', username)
+			.orWhere('email', username);
+
+		try {
+			user = await query.firstOrFail();
+		} catch (err) {
+			throw {
+				code: 'INVALID_CREDENTIALS_ERR',
+				message: 'Invalid credentials',
+			};
+		}
+
+		if (!(await Hash.verify(user.password, password)))
+			throw {
+				code: 'INVALID_CREDENTIALS_ERR',
+				message: 'Invalid password',
+			};
+
+		try {
+			const token = await auth.use('api')
+				.generate(user, {
+					expiresIn: '7days',
+				});
+			
+	
+			return token.toJSON();
+		} catch (err) {
+			throw {
+				code: 'INTERNAL_SERVER_ERR',
+				message: err,
+			};	
+		}
+	}
+
+	public async logout(): Promise<{ revoked: boolean; }> {
+		let auth: AuthContract;
+
+		try {
+			auth = HttpContext.getOrFail().auth;
+		} catch (err) {
+			throw {
+				code: 'INTERNAL_SERVER_ERR',
+				message: err,
+			};
+		}
+		
+		try {
+			await auth.use('api').revoke();
+		} catch (err) {
+			throw err;
+		}	
+		
+		return {
+			revoked: true,
+		};
+	}
+
+	public loggedUser(): User | undefined {
+		let auth: AuthContract;
+
+		try {
+			auth = HttpContext.getOrFail().auth;
+		} catch (err) {
+			throw {
+				code: 'INTERNAL_SERVER_ERR',
+				message: err,
+			};
+		}
+		
+		return auth.user;
 	}
 
 	public async all(params?: AllQueryParams): Promise<User[] | { meta: any; data: ModelObject[]; }> {
