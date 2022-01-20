@@ -1,63 +1,44 @@
 import { HttpContextContract } from '@ioc:Adonis/Core/HttpContext'
-import Label from 'App/Models/Label';
+import LabelsRepository from 'App/Repositories/LabelsRepository';
+
+
 
 import StoreLabelValidator from 'App/Validators/StoreLabelValidator';
 import UpdateLabelValidator from 'App/Validators/UpdateLabelValidator';
 
-export default class LabelsController {
-	private columns: Array<string>;
-
-	private constructor() {
-		const columns = Array.from(Label.$columnsDefinitions, ([key]) => key);
-		columns.splice(columns.indexOf('deletedAt'), 1);
-
-		this.columns = columns;
-	}
+export default class LabelsController {	
+	private repository = new LabelsRepository();
 	
 	public async index({ request, response }: HttpContextContract) {
 		const {
-			company,
-			name,
-			description,
-			color,
-			columns = this.columns,
-			limit,
-			page,
-			pageLimit = 10,
+			columns,
+			preload,
+			trashed,
+			trashedOnly,
+			...reqQueryParams
 		} = request.only([
-			'company',
 			'name',
 			'description',
 			'color',
-			'columns',
+			'company',
+			'trashed',
+			'trashedOnly',
 			'limit',
 			'page',
 			'pageLimit',
+			'columns',
+			'preload',
 		]);
 
-		const query = Label.query()
-			.select(typeof columns === 'string' ? columns.split(',') : columns);
-
-		if (company)
-			query.where('companyId', company);
-
-		if (name)
-			query.where('name', 'LIKE', `%${name}%`);
-
-		if (description)
-			query.where('description', 'LIKE', `%${description}%`);
-
-		if (color)
-			query.where('color', color);
-
-		if (limit)
-			query.limit(limit);
+		const preloads = preload ? preload.split(',') : [];
 
 		try {
-			if (page)
-				return (await query.paginate(page, pageLimit)).toJSON();
-
-			return await query;
+			return await this.repository.all({
+				...reqQueryParams,
+				columns: columns ? columns.split(',') : null,
+				preloadCompany: preloads.includes('company'),
+				preloadTasks: preloads.includes('tasks'),
+			});
 		} catch (err) {
 			if (err?.errno)
 				return response.badRequest(err);
@@ -73,12 +54,7 @@ export default class LabelsController {
 			return response.badRequest(err);
 		}
 
-		const {
-			name,
-			description,
-			color,
-			company,
-		} = request.only([
+		const reqBody = request.only([
 			'name',
 			'description',
 			'color',
@@ -86,14 +62,9 @@ export default class LabelsController {
 		]);
 
 		try {
-			const label = await Label.create({
-				name,
-				description,
-				color,
-				companyId: company,
-			});
-
-			return response.created(label);
+			return response.created(
+				await this.repository.persist(reqBody),
+			);
 		} catch (err) {
 			return response.internalServerError(err);
 		}
@@ -101,20 +72,25 @@ export default class LabelsController {
 
   public async show({ params, request, response }: HttpContextContract) {
 		const { id } = params;
+		const {
+			columns,
+			preload,
+		} = request.only([
+			'columns',
+			'preload',
+		]); 
 
-		const { columns = this.columns } = request.only(['columns']);
+		const preloads = preload ? preload.split(',') : [];
 
 		try {
-			return await Label.query()
-				.select(typeof columns === 'string' ? columns.split(',') : columns)
-				.where('id', id)
-				.firstOrFail()
+			return await this.repository.findOrFail(id, {
+				columns: columns ? columns.split(',') : null,
+				preloadCompany: preloads.includes('company'),
+				preloadTasks: preloads.includes('tasks'),
+			});
 		} catch (err) {
 			if (err.code === 'E_ROW_NOT_FOUND')
-				return response.notFound({
-					code: err.code,
-					message: 'Record not found.',
-				});
+				return response.notFound(err);
 
 			if (err?.errno)
 				return response.badRequest(err);
@@ -125,16 +101,6 @@ export default class LabelsController {
 
   public async update({ params, request, response }: HttpContextContract) {
 		const { id } = params;
-		let label: Label;
-
-		try {
-			label = await Label.findOrFail(id);
-		} catch (err) {
-			return response.notFound({
-				code: err.code,
-				message: 'Record not found.',
-			});
-		}
 
 		try {
 			await request.validate(UpdateLabelValidator);
@@ -142,80 +108,46 @@ export default class LabelsController {
 			return response.badRequest(err);
 		}
 
-		const {
-			name,
-			description,
-			color,
-			company,
-		} = request.only([
+		const reqBody = request.only([
 			'name',
 			'description',
 			'color',
 			'company',
 		]);
 
-		if (name)
-			label.name = name;
-
-		if (description)
-			label.description = description;
-
-		if (color)
-			label.color = color;
-
-		if (company)
-			label.companyId = company;
-
 		try {
-			await label.save();
-
-			return label;
+			return this.repository.update({ id, ...reqBody });
 		} catch (err) {
+			if (err.code === 'E_ROW_NOT_FOUND')
+				return response.notFound(err);
+
 			return response.internalServerError(err);
 		}
 	}
 
-  public async destroy({ params, response }: HttpContextContract) {
+	public async destroy({ params, response }: HttpContextContract) {
 		const { id } = params;
-		let label: Label;
 
 		try {
-			label = await Label.findOrFail(id);
+			return await this.repository.delete(id);
 		} catch (err) {
-			return response.notFound({
-				code: err.code,
-				message: 'Record not found.',
-			});
-		}
+			if (err.code === 'E_ROW_NOT_FOUND')
+				return response.notFound(err);
 
-		try {
-			await label.softDelete();
-		} catch (err) {
 			return response.internalServerError(err);
 		}
-
-		return true;
 	}
 
-  public async restore({ params, response }: HttpContextContract) {
+	public async restore({ params, response }: HttpContextContract) {
 		const { id } = params;
-		let label: any;
 
 		try {
-			label = await Label.findOnlyTrashedOrFail(id);
+			return await this.repository.restore(id);
 		} catch (err) {
-			return response.notFound({
-				code: err.code,
-				message: 'No deleted record found.',
-			});
-		}
+			if (err.code === 'E_ROW_NOT_FOUND')
+				return response.notFound(err);
 
-		try {
-			await label.restore();
-		} catch (err) {
 			return response.internalServerError(err);
 		}
-
-		return true;
 	}
 }

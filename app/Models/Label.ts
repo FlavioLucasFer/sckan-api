@@ -47,7 +47,18 @@ export default class Label extends SoftDeleteBaseModel {
 	@column.dateTime({ serializeAs: null })
 	public deletedAt: DateTime;
 
-	@belongsTo(() => Company)
+	@belongsTo(() => Company, {
+		onQuery: query => {
+			query.select([
+				'id',
+				'name',
+				'tradeName',
+				'email',
+				'createdAt',
+				'updatedAt',
+			]);
+		},
+	})
 	public company: BelongsTo<typeof Company>;
 
 	@manyToMany(() => Task, { pivotTable: 'task_labels' })
