@@ -2,6 +2,8 @@ import {
 	belongsTo,
 	BelongsTo,
 	column,
+	hasMany,
+	HasMany,
 	HasOne,
 	hasOne, 
 } from '@ioc:Adonis/Lucid/Orm'
@@ -9,6 +11,7 @@ import { DateTime } from 'luxon'
 
 import SoftDeleteBaseModel from 'App/Models/SoftDeleteBaseModel';
 import Company from 'App/Models/Company';
+import Task from 'App/Models/Task';
 
 import Serialize from 'App/Helpers/Serialize';
 
@@ -46,7 +49,18 @@ export default class Status extends SoftDeleteBaseModel {
 	@column.dateTime({ serializeAs: null })
 	public deletedAt: DateTime;
 
-	@belongsTo(() => Company, { foreignKey: 'companyId' })
+	@belongsTo(() => Company, {
+		onQuery: query => {
+			query.select([
+				'id',
+				'name',
+				'tradeName',
+				'email',
+				'createdAt',
+				'updatedAt',
+			]);
+		},
+	})
 	public company: BelongsTo<typeof Company>;
 
 	@hasOne(() => Status, { foreignKey: 'previousStatusId' })
@@ -54,4 +68,7 @@ export default class Status extends SoftDeleteBaseModel {
 
 	@hasOne(() => Status, { foreignKey: 'nextStatusId' })
 	public nextStatus: HasOne<typeof Status>;
+
+	@hasMany(() => Task)
+	public tasks: HasMany<typeof Task>;
 }
