@@ -1,11 +1,13 @@
-import Hash from '@ioc:Adonis/Core/Hash';
 import { HttpContextContract } from '@ioc:Adonis/Core/HttpContext';
 
+import UsersRepository from 'App/Repositories/UsersRepository';
+
 import LoginValidator from 'App/Validators/LoginValidator';
-import User from 'App/Models/User';
 
 export default class AuthController {
-	public async login({ auth, request, response } : HttpContextContract) {
+	private usersRepository = new UsersRepository();
+	
+	public async login({ request, response } : HttpContextContract) {
 		try {
 			await request.validate(LoginValidator);
 		} catch (err) {
@@ -19,46 +21,30 @@ export default class AuthController {
 			'username', 
 			'password',
 		]);
-
-		let user: User | null;
-		const query = User.query()
-			.select([
-				'id',
-				'password',
-			])
-			.where('username', username)
-			.orWhere('email', username);
 			
 		try {
-			user = await query.firstOrFail();
+			return await this.usersRepository.login(username, password);
 		} catch (err) {
-			return response.badRequest('Invalid credentials');
+			if (err?.code === 'INVALID_CREDENTIALS_ERR')
+				return response.badRequest(err);
+			
+			return response.internalServerError(err);
 		}
-
-		if (!(await Hash.verify(user.password, password)))
-			return response.badRequest('Invalid password');
-
-		const token = await auth.use('api')
-			.generate(user, {
-				expiresIn: '7days',
-			});
-
-		return token.toJSON();
 	};
 
-	public async logout({ auth, response } : HttpContextContract) {
+	public async logout({ response } : HttpContextContract) {
 		try {
-			await auth.use('api').revoke();
-
-			return {
-				revoked: true,
-			};
+			return await this.usersRepository.logout();
 		} catch (err) {
 			return response.internalServerError(err);
 		}
 	}
 
-	public async loggedUser({ auth }: HttpContextContract) {
-		return auth.user;
+	public async loggedUser({ response }: HttpContextContract) {
+		try {
+			return this.usersRepository.loggedUser();
+		} catch (err) {
+			return response.internalServerError(err);
+		}
 	}
 }
